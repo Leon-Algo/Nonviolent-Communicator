@@ -1,2 +1,7 @@
 .DS_Store
 .specstory
+__pycache__/
+*.pyc
+.venv/
+.env
+backend/.env
