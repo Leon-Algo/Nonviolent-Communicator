@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://nvc-practice-api.vercel.app/api/:path*"
+    },
+    {
+      "source": "/health-backend",
+      "destination": "https://nvc-practice-api.vercel.app/health"
+    }
+  ]
+}

@@ -15,9 +15,9 @@ function setOutput(value) {
 }
 
 function getConfig() {
+  const fallbackBaseUrl = window.location.origin;
   const apiBaseUrl =
-    byId("apiBaseUrl").value.trim().replace(/\/+$/, "") ||
-    "https://nvc-practice-api.vercel.app";
+    byId("apiBaseUrl").value.trim().replace(/\/+$/, "") || fallbackBaseUrl;
   const userId = byId("mockUserId").value.trim();
   if (!userId) {
     throw new Error("Mock User UUID 不能为空");
@@ -116,9 +116,16 @@ function saveConfig() {
 }
 
 function bind() {
-  const savedApi = localStorage.getItem("api_base_url");
+  const savedApiRaw = localStorage.getItem("api_base_url");
+  const shouldForceProxy =
+    !savedApiRaw ||
+    /nvc-practice-api\.vercel\.app|api\.leonalgo\.site/.test(savedApiRaw);
+  const savedApi = shouldForceProxy ? window.location.origin : savedApiRaw;
+  if (shouldForceProxy) {
+    localStorage.setItem("api_base_url", window.location.origin);
+  }
   const savedUid = localStorage.getItem("mock_user_id") || ensureUserId();
-  if (savedApi) byId("apiBaseUrl").value = savedApi;
+  byId("apiBaseUrl").value = savedApi || window.location.origin;
   byId("mockUserId").value = savedUid;
 
   byId("newUserBtn").addEventListener("click", () => {
@@ -126,6 +133,15 @@ function bind() {
     byId("mockUserId").value = uid;
     localStorage.setItem("mock_user_id", uid);
     setOutput({ ok: true, message: "已生成新 mock 用户", user_id: uid });
+  });
+  byId("useProxyBtn").addEventListener("click", () => {
+    byId("apiBaseUrl").value = window.location.origin;
+    localStorage.setItem("api_base_url", window.location.origin);
+    setOutput({
+      ok: true,
+      message: "已切换为同域代理模式",
+      api_base_url: window.location.origin,
+    });
   });
   byId("saveConfigBtn").addEventListener("click", saveConfig);
   byId("createSceneBtn").addEventListener("click", () => createScene().catch(showError));
