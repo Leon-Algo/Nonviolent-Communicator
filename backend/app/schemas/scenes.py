@@ -1,8 +1,11 @@
+from typing import Annotated
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+PainPoint = Annotated[str, Field(min_length=1, max_length=80)]
 
 
 class TemplateId(StrEnum):
@@ -38,7 +41,7 @@ class SceneCreateRequest(BaseModel):
     counterparty_role: CounterpartyRole
     relationship_level: RelationshipLevel
     goal: str = Field(min_length=1, max_length=240)
-    pain_points: list[str] = Field(default_factory=list, max_length=5)
+    pain_points: list[PainPoint] = Field(default_factory=list, max_length=5)
     context: str = Field(min_length=1, max_length=1200)
     power_dynamic: PowerDynamic
 
