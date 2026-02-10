@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+ROOT_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -25,7 +30,10 @@ class Settings(BaseSettings):
     )
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=(str(BACKEND_DIR / ".env"), str(ROOT_DIR / ".env")),
+        env_file_encoding="utf-8",
+    )
 
     @property
     def sqlalchemy_database_url(self) -> str:
