@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from uuid import UUID
 
 from fastapi import HTTPException, status
 
 
 @dataclass(slots=True)
 class AuthUser:
-    user_id: str
+    user_id: UUID
 
 
 def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
@@ -29,11 +30,19 @@ def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
             detail="invalid mock token",
         )
 
-    user_id = token.removeprefix("mock_").strip()
-    if not user_id:
+    user_id_raw = token.removeprefix("mock_").strip()
+    if not user_id_raw:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid mock token user id",
         )
+
+    try:
+        user_id = UUID(user_id_raw)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="mock user id must be a valid UUID",
+        ) from exc
 
     return AuthUser(user_id=user_id)

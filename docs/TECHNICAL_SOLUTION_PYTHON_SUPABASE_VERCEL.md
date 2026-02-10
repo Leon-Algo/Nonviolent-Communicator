@@ -25,6 +25,9 @@
 6. 数据结构与接口契约继续沿用:
    - `spec/openapi/nvc-practice-coach.v1.yaml`
    - `db/migrations/0001_init_nvc_practice.sql`
+7. 模型调用采用 ModelScope OpenAI 兼容网关:
+   - `OPENAI_BASE_URL=https://api-inference.modelscope.cn/v1`
+   - `LLM_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct`
 
 ---
 
@@ -225,12 +228,13 @@ MVP 可先不开 RLS，先由后端保证 `user_id` 访问隔离；
 
 1. `APP_ENV=production`
 2. `MOCK_AUTH_ENABLED=true`
-3. `DATABASE_URL=<supabase_pooler_url>`
+3. `DATABASE_URL=<supabase_pooler_6543_url>`
 4. `SUPABASE_URL=<project_url>`
 5. `SUPABASE_SERVICE_ROLE_KEY=<server_only>`
-6. `LLM_API_KEY=<provider_key>`
-7. `LLM_MODEL=<model_name>`
-8. `LOG_LEVEL=INFO`
+6. `LLM_API_KEY=<modelscope_key>`
+7. `LLM_MODEL=Qwen/Qwen3-Coder-480B-A35B-Instruct`
+8. `OPENAI_BASE_URL=https://api-inference.modelscope.cn/v1`
+9. `LOG_LEVEL=INFO`
 
 ### 8.3 发布流程
 

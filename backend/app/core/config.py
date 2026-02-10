@@ -14,10 +14,28 @@ class Settings(BaseSettings):
     )
 
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
-    llm_model: str | None = Field(default=None, alias="LLM_MODEL")
+    llm_model: str = Field(
+        default="Qwen/Qwen3-Coder-480B-A35B-Instruct", alias="LLM_MODEL"
+    )
+    openai_base_url: str = Field(
+        default="https://api-inference.modelscope.cn/v1", alias="OPENAI_BASE_URL"
+    )
+    anthropic_base_url: str = Field(
+        default="https://api-inference.modelscope.cn", alias="ANTHROPIC_BASE_URL"
+    )
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @property
+    def sqlalchemy_database_url(self) -> str:
+        if self.database_url.startswith("postgresql+asyncpg://"):
+            return self.database_url
+        if self.database_url.startswith("postgresql://"):
+            return self.database_url.replace(
+                "postgresql://", "postgresql+asyncpg://", 1
+            )
+        return self.database_url
 
 
 settings = Settings()
