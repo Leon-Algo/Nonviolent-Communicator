@@ -29,6 +29,9 @@ class Settings(BaseSettings):
         default="https://api-inference.modelscope.cn", alias="ANTHROPIC_BASE_URL"
     )
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+    cors_origin_regex: str = Field(
+        default=r"https://.*\.vercel\.app", alias="CORS_ORIGIN_REGEX"
+    )
 
     model_config = SettingsConfigDict(
         env_file=(str(BACKEND_DIR / ".env"), str(ROOT_DIR / ".env")),
