@@ -1,0 +1,600 @@
+openapi: 3.1.0
+info:
+  title: NVC Practice Coach API
+  version: 1.0.0
+  description: API contract for the NVC Practice Coach MVP.
+servers:
+  - url: https://api.nvc-coach.example.com/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local
+security:
+  - bearerAuth: []
+tags:
+  - name: scenes
+  - name: sessions
+  - name: reflections
+  - name: progress
+paths:
+  /scenes:
+    post:
+      tags: [scenes]
+      operationId: createScene
+      summary: Create a conversation practice scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SceneCreateRequest'
+      responses:
+        '201':
+          description: Scene created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SceneCreateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sessions:
+    post:
+      tags: [sessions]
+      operationId: createSession
+      summary: Start a practice session from an existing scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionCreateRequest'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionCreateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sessions/{session_id}/messages:
+    post:
+      tags: [sessions]
+      operationId: createMessageWithFeedback
+      summary: Submit a user message and receive AI response plus OFNR feedback
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreateRequest'
+      responses:
+        '200':
+          description: Message processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageCreateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/SafetyBlockedError'
+        '429':
+          $ref: '#/components/responses/RateLimitedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sessions/{session_id}/rewrite:
+    post:
+      tags: [sessions]
+      operationId: rewriteMessage
+      summary: Rewrite one user message into a more NVC-compatible expression
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewriteCreateRequest'
+      responses:
+        '200':
+          description: Rewrite generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewriteCreateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/SafetyBlockedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sessions/{session_id}/summary:
+    post:
+      tags: [sessions]
+      operationId: createSummary
+      summary: Generate an action card summary for a completed session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Summary generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryCreateResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /reflections:
+    post:
+      tags: [reflections]
+      operationId: createReflection
+      summary: Submit next-day reflection for a session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReflectionCreateRequest'
+      responses:
+        '201':
+          description: Reflection created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReflectionCreateResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /progress/weekly:
+    get:
+      tags: [progress]
+      operationId: getWeeklyProgress
+      summary: Get weekly progress metrics for current user
+      parameters:
+        - in: query
+          name: week_start
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Weekly metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyProgressResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    SessionId:
+      in: path
+      name: session_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: VALIDATION_ERROR
+            message: goal is required
+            request_id: f2cf1f5e-3d4d-4f1f-bffc-e103a7f03a8a
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: UNAUTHORIZED
+            message: missing or invalid token
+            request_id: 4f0e9d9c-f54c-4098-96ca-9d6f06f725fd
+    NotFoundError:
+      description: Requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: NOT_FOUND
+            message: session not found
+            request_id: dc6a22cb-2892-4e9c-b678-e4605a9f11df
+    ConflictError:
+      description: Resource state conflicts with request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: CONFLICT
+            message: reflection already exists for this session
+            request_id: a3fec497-7747-4209-86bb-499b1608c3cc
+    SafetyBlockedError:
+      description: Request blocked by safety policy
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: SAFETY_BLOCKED
+            message: harmful content detected
+            request_id: 1db6f0fb-c7f6-4308-a035-fe1f34c1094e
+    RateLimitedError:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: RATE_LIMITED
+            message: retry later
+            request_id: 186f4180-8b81-4cfe-8b74-1341d65e1ba6
+    InternalError:
+      description: Unexpected internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: INTERNAL_ERROR
+            message: internal server error
+            request_id: 5bf1a3a9-1dc8-4128-bff1-455713e6a0dc
+  schemas:
+    TemplateId:
+      type: string
+      enum: [PEER_FEEDBACK, MANAGER_ALIGNMENT, CROSS_TEAM_CONFLICT, CUSTOM]
+    CounterpartyRole:
+      type: string
+      enum: [PEER, MANAGER, REPORT, CLIENT, OTHER]
+    RelationshipLevel:
+      type: string
+      enum: [SMOOTH, NEUTRAL, TENSE]
+    PowerDynamic:
+      type: string
+      enum: [USER_HIGHER, PEER_LEVEL, COUNTERPART_HIGHER]
+    SessionState:
+      type: string
+      enum: [ACTIVE, COMPLETED, ABANDONED]
+    OfnrStatus:
+      type: string
+      enum: [MISSING, WEAK, GOOD]
+    RiskLevel:
+      type: string
+      enum: [LOW, MEDIUM, HIGH]
+    BlockerCode:
+      type: string
+      enum: [NO_CHANCE, EMOTION_SPIKE, POWER_GAP, WORDING_ISSUE, OTHER]
+    RewriteStyle:
+      type: string
+      enum: [NEUTRAL]
+    SceneCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - title
+        - template_id
+        - counterparty_role
+        - relationship_level
+        - goal
+        - context
+        - power_dynamic
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 80
+        template_id:
+          $ref: '#/components/schemas/TemplateId'
+        counterparty_role:
+          $ref: '#/components/schemas/CounterpartyRole'
+        relationship_level:
+          $ref: '#/components/schemas/RelationshipLevel'
+        goal:
+          type: string
+          minLength: 1
+          maxLength: 240
+        pain_points:
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            minLength: 1
+            maxLength: 80
+          default: []
+        context:
+          type: string
+          minLength: 1
+          maxLength: 1200
+        power_dynamic:
+          $ref: '#/components/schemas/PowerDynamic'
+    SceneCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [scene_id, status, created_at]
+      properties:
+        scene_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [ACTIVE]
+        created_at:
+          type: string
+          format: date-time
+    SessionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [scene_id, target_turns]
+      properties:
+        scene_id:
+          type: string
+          format: uuid
+        target_turns:
+          type: integer
+          minimum: 5
+          maximum: 8
+    SessionCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [session_id, state, current_turn, created_at]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        state:
+          $ref: '#/components/schemas/SessionState'
+        current_turn:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+    MessageCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [client_message_id, content]
+      properties:
+        client_message_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+    AssistantMessage:
+      type: object
+      additionalProperties: false
+      required: [message_id, content]
+      properties:
+        message_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+    OfnrDimensionFeedback:
+      type: object
+      additionalProperties: false
+      required: [status, reason, suggestion]
+      properties:
+        status:
+          $ref: '#/components/schemas/OfnrStatus'
+        reason:
+          type: string
+        suggestion:
+          type: string
+    OfnrFeedback:
+      type: object
+      additionalProperties: false
+      required: [observation, feeling, need, request]
+      properties:
+        observation:
+          $ref: '#/components/schemas/OfnrDimensionFeedback'
+        feeling:
+          $ref: '#/components/schemas/OfnrDimensionFeedback'
+        need:
+          $ref: '#/components/schemas/OfnrDimensionFeedback'
+        request:
+          $ref: '#/components/schemas/OfnrDimensionFeedback'
+    FeedbackPayload:
+      type: object
+      additionalProperties: false
+      required: [overall_score, risk_level, ofnr, next_best_sentence]
+      properties:
+        overall_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        ofnr:
+          $ref: '#/components/schemas/OfnrFeedback'
+        next_best_sentence:
+          type: string
+    MessageCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [user_message_id, assistant_message, feedback, turn]
+      properties:
+        user_message_id:
+          type: string
+          format: uuid
+        assistant_message:
+          $ref: '#/components/schemas/AssistantMessage'
+        feedback:
+          $ref: '#/components/schemas/FeedbackPayload'
+        turn:
+          type: integer
+          minimum: 1
+    RewriteCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [source_message_id, rewrite_style]
+      properties:
+        source_message_id:
+          type: string
+          format: uuid
+        rewrite_style:
+          $ref: '#/components/schemas/RewriteStyle'
+    RewriteCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [rewrite_id, rewritten_content]
+      properties:
+        rewrite_id:
+          type: string
+          format: uuid
+        rewritten_content:
+          type: string
+    SummaryCreateResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - summary_id
+        - opening_line
+        - request_line
+        - fallback_line
+        - risk_triggers
+        - created_at
+      properties:
+        summary_id:
+          type: string
+          format: uuid
+        opening_line:
+          type: string
+        request_line:
+          type: string
+        fallback_line:
+          type: string
+        risk_triggers:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+    ReflectionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [session_id, used_in_real_world]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        used_in_real_world:
+          type: boolean
+        outcome_score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        blocker_code:
+          $ref: '#/components/schemas/BlockerCode'
+        blocker_note:
+          type: string
+          maxLength: 500
+    ReflectionCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [reflection_id, created_at]
+      properties:
+        reflection_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+    WeeklyProgressResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - week_start
+        - practice_count
+        - summary_count
+        - real_world_used_count
+        - avg_outcome_score
+      properties:
+        week_start:
+          type: string
+          format: date
+        practice_count:
+          type: integer
+          minimum: 0
+        summary_count:
+          type: integer
+          minimum: 0
+        real_world_used_count:
+          type: integer
+          minimum: 0
+        avg_outcome_score:
+          type: number
+          minimum: 0
+          maximum: 5
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error_code, message, request_id]
+      properties:
+        error_code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+            - SAFETY_BLOCKED
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+        message:
+          type: string
+        request_id:
+          type: string
+          format: uuid
