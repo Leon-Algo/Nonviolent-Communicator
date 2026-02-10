@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -40,13 +40,47 @@ class Settings(BaseSettings):
 
     @property
     def sqlalchemy_database_url(self) -> str:
-        if self.database_url.startswith("postgresql+asyncpg://"):
-            return self.database_url
-        if self.database_url.startswith("postgresql://"):
-            return self.database_url.replace(
+        db_url = self.database_url.strip()
+        if db_url.startswith("postgresql+asyncpg://"):
+            return db_url
+        if db_url.startswith("postgresql://"):
+            return db_url.replace(
                 "postgresql://", "postgresql+asyncpg://", 1
             )
-        return self.database_url
+        return db_url
+
+    @field_validator(
+        "app_env",
+        "log_level",
+        "database_url",
+        "supabase_url",
+        "supabase_service_role_key",
+        "llm_api_key",
+        "llm_model",
+        "openai_base_url",
+        "anthropic_base_url",
+        "cors_origins",
+        "cors_origin_regex",
+        mode="before",
+    )
+    @classmethod
+    def strip_string_values(cls, value):
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator("mock_auth_enabled", mode="before")
+    @classmethod
+    def parse_mock_auth_enabled(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return value
 
 
 settings = Settings()
