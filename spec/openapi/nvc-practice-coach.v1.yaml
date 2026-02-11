@@ -406,6 +406,7 @@ components:
         client_message_id:
           type: string
           format: uuid
+          description: Client-side idempotency key. Reusing the same value should return the same response.
         content:
           type: string
           minLength: 1

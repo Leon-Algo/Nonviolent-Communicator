@@ -26,6 +26,7 @@
 2. 新建 Query
 3. 粘贴文件内容:
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0001_init_nvc_practice.sql`
+   - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0002_add_idempotency_keys.sql`
 4. 点击 Run
 5. 运行后执行校验 SQL:
 

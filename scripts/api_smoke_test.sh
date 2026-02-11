@@ -31,12 +31,23 @@ session_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions" -H "${AUTH_HEADER
 echo "${session_resp}" | jq .
 session_id="$(echo "${session_resp}" | jq -r '.session_id')"
 
-echo "[3/3] create message with feedback"
+echo "[3/4] create message with feedback"
 create_message_payload='{
   "client_message_id":"4c16e607-2c2f-4a89-bf20-4a33317b640a",
   "content":"你们总是拖延，根本不专业。"
 }'
 message_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions/${session_id}/messages" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_message_payload}")"
 echo "${message_resp}" | jq .
+first_user_message_id="$(echo "${message_resp}" | jq -r '.user_message_id')"
+
+echo "[4/4] retry same client_message_id (idempotency check)"
+retry_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions/${session_id}/messages" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_message_payload}")"
+echo "${retry_resp}" | jq .
+retry_user_message_id="$(echo "${retry_resp}" | jq -r '.user_message_id')"
+
+if [[ "${first_user_message_id}" != "${retry_user_message_id}" ]]; then
+  echo "Idempotency check failed: expected same user_message_id, got ${first_user_message_id} vs ${retry_user_message_id}" >&2
+  exit 1
+fi
 
 echo "Smoke test complete."

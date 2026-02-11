@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -27,6 +28,38 @@ from app.services.nvc_service import (
 )
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
+MESSAGE_ENDPOINT_KEY = "POST:/api/v1/sessions/{session_id}/messages"
+
+
+async def _get_idempotent_message_response(
+    db: AsyncSession,
+    user_id: UUID,
+    session_id: UUID,
+    client_message_id: UUID,
+) -> MessageCreateResponse | None:
+    existing_result = await db.execute(
+        text(
+            """
+            SELECT response_body
+            FROM idempotency_keys
+            WHERE user_id = :user_id
+              AND session_id = :session_id
+              AND endpoint = :endpoint
+              AND client_message_id = :client_message_id
+            LIMIT 1
+            """
+        ),
+        {
+            "user_id": str(user_id),
+            "session_id": str(session_id),
+            "endpoint": MESSAGE_ENDPOINT_KEY,
+            "client_message_id": str(client_message_id),
+        },
+    )
+    row = existing_result.mappings().first()
+    if not row:
+        return None
+    return MessageCreateResponse.model_validate(row["response_body"])
 
 
 @router.post("", response_model=SessionCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -88,6 +121,15 @@ async def create_session_message(
     scene = await get_scene_owned_by_user(db, session["scene_id"], user.user_id)
     if not scene:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="scene not found")
+
+    existing_response = await _get_idempotent_message_response(
+        db=db,
+        user_id=user.user_id,
+        session_id=session_id,
+        client_message_id=payload.client_message_id,
+    )
+    if existing_response:
+        return existing_response
 
     turn = int(session["current_turn"]) + 1
 
@@ -175,9 +217,7 @@ async def create_session_message(
             "session_id": str(session_id),
         },
     )
-    await db.commit()
-
-    return MessageCreateResponse(
+    response = MessageCreateResponse(
         user_message_id=user_message_id,
         assistant_message=AssistantMessage(
             message_id=assistant_message_id,
@@ -186,6 +226,51 @@ async def create_session_message(
         feedback=analysis.feedback,
         turn=turn,
     )
+    try:
+        await db.execute(
+            text(
+                """
+                INSERT INTO idempotency_keys (
+                    user_id,
+                    session_id,
+                    endpoint,
+                    client_message_id,
+                    response_body
+                )
+                VALUES (
+                    :user_id,
+                    :session_id,
+                    :endpoint,
+                    :client_message_id,
+                    CAST(:response_body AS jsonb)
+                )
+                """
+            ),
+            {
+                "user_id": str(user.user_id),
+                "session_id": str(session_id),
+                "endpoint": MESSAGE_ENDPOINT_KEY,
+                "client_message_id": str(payload.client_message_id),
+                "response_body": json.dumps(response.model_dump(mode="json")),
+            },
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        existing_response = await _get_idempotent_message_response(
+            db=db,
+            user_id=user.user_id,
+            session_id=session_id,
+            client_message_id=payload.client_message_id,
+        )
+        if existing_response:
+            return existing_response
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="duplicate client message id",
+        )
+
+    return response
 
 
 @router.post("/{session_id}/rewrite", response_model=RewriteCreateResponse)
