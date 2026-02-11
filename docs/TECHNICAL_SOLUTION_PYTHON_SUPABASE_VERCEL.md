@@ -17,7 +17,9 @@
 
 1. 后端框架采用 `FastAPI + Pydantic v2 + Uvicorn`。
 2. 数据访问采用 `Supabase PostgreSQL (async SQLAlchemy + asyncpg, NullPool)`。
-3. 鉴权先采用 `Mock Bearer Token`，接口层注入 `current_user_id`。
+3. 鉴权采用双模式:
+   - 本地联调: `Mock Bearer Token`
+   - 线上测试: `Supabase JWT`（JWKS 校验，失败回退 `/auth/v1/user`）
 4. AI 逻辑采用“两段式服务”:
    - 对话生成服务
    - OFNR 分析/改写服务
@@ -115,9 +117,9 @@ backend/
 
 ---
 
-## 4. 鉴权方案（MVP Mock）
+## 4. 鉴权方案（Mock + Supabase JWT）
 
-### 4.1 规则
+### 4.1 Mock 规则（联调模式）
 
 1. 请求头: `Authorization: Bearer mock_<user_id>`
 2. 示例: `Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302`
@@ -126,13 +128,21 @@ backend/
    - 解析 `user_id`
    - 注入到 `request.state.user_id`
 
-### 4.2 降级与错误
+### 4.2 Supabase JWT 规则（测试/生产模式）
+
+1. 请求头: `Authorization: Bearer <access_token>`
+2. 后端流程:
+   - 先尝试 JWKS 本地验签
+   - 失败后回退调用 `GET /auth/v1/user` 验证 token
+3. 解析 `sub/email/user_metadata` 映射到 `current_user`
+
+### 4.3 降级与错误
 
 - 缺失 token -> `401 UNAUTHORIZED`
 - token 格式错误 -> `401 UNAUTHORIZED`
 - user 不存在 -> 自动创建最小用户记录（MVP 提升可用性）
 
-### 4.3 后续切换路径（MVP 后）
+### 4.4 后续切换路径（MVP 后）
 
 1. 接 Supabase Auth/JWT 验签
 2. `deps.get_current_user` 替换实现，不动业务层

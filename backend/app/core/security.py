@@ -7,9 +7,11 @@ from fastapi import HTTPException, status
 @dataclass(slots=True)
 class AuthUser:
     user_id: UUID
+    email: str | None = None
+    display_name: str | None = None
 
 
-def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
+def extract_bearer_token(authorization: str | None) -> str:
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,6 +26,16 @@ def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
         )
 
     token = authorization[len(prefix) :].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="missing bearer token",
+        )
+    return token
+
+
+def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
+    token = extract_bearer_token(authorization)
     if not token.startswith("mock_"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,4 +57,8 @@ def parse_mock_bearer_token(authorization: str | None) -> AuthUser:
             detail="mock user id must be a valid UUID",
         ) from exc
 
-    return AuthUser(user_id=user_id)
+    return AuthUser(
+        user_id=user_id,
+        email=f"{user_id}@mock.local",
+        display_name="Mock User",
+    )

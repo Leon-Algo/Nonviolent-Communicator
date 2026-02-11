@@ -18,7 +18,7 @@ async def create_reflection(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ReflectionCreateResponse:
-    await ensure_user_exists(db, user.user_id)
+    await ensure_user_exists(db, user)
     session = await get_session_owned_by_user(db, payload.session_id, user.user_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")

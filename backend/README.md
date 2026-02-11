@@ -34,6 +34,16 @@ curl http://127.0.0.1:8000/health
 pytest tests -q
 ```
 
+6. Auth mode switch:
+
+```bash
+# local mock auth
+AUTH_MODE=mock
+
+# Supabase JWT auth
+AUTH_MODE=supabase
+```
+
 5. Mock auth token format:
 
 ```text
@@ -60,6 +70,7 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 
 - FastAPI scaffold ready
 - Mock auth dependency ready
+- Supabase JWT verification ready (JWKS + /auth/v1/user fallback)
 - Health endpoint ready
 - Core API endpoints connected to PostgreSQL
 - AI generation supports ModelScope OpenAI-compatible API with local fallback

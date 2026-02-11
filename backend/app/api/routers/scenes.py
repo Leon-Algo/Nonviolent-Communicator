@@ -19,7 +19,7 @@ async def create_scene(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SceneCreateResponse:
-    await ensure_user_exists(db, user.user_id)
+    await ensure_user_exists(db, user)
 
     result = await db.execute(
         text(

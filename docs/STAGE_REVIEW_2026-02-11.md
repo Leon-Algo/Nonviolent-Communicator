@@ -94,3 +94,9 @@
 对应执行方案文档:
 
 - `docs/DEV_PLAN_v0.4.md`
+
+补充进展（同日迭代）:
+
+1. 已完成 Supabase JWT 鉴权接入（支持 `AUTH_MODE` 切换）
+2. 已新增并验证消息幂等迁移 `0002_add_idempotency_keys.sql`
+3. 已补齐后端自动化测试与 CI

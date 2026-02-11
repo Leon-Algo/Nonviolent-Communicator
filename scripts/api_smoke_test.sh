@@ -20,12 +20,12 @@ create_scene_payload='{
   "power_dynamic":"PEER_LEVEL"
 }'
 
-echo "[1/3] create scene"
+echo "[1/4] create scene"
 scene_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/scenes" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_scene_payload}")"
 echo "${scene_resp}" | jq .
 scene_id="$(echo "${scene_resp}" | jq -r '.scene_id')"
 
-echo "[2/3] create session"
+echo "[2/4] create session"
 create_session_payload="$(jq -n --arg sid "${scene_id}" '{"scene_id":$sid,"target_turns":6}')"
 session_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_session_payload}")"
 echo "${session_resp}" | jq .

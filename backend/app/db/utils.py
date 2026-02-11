@@ -3,20 +3,26 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import AuthUser
 
-async def ensure_user_exists(db: AsyncSession, user_id: UUID) -> None:
+
+async def ensure_user_exists(db: AsyncSession, user: AuthUser) -> None:
+    email = (user.email or f"{user.user_id}@local.user").strip().lower()
+    display_name = (user.display_name or "User").strip()[:120]
     await db.execute(
         text(
             """
             INSERT INTO users (id, email, display_name)
             VALUES (:user_id, :email, :display_name)
-            ON CONFLICT (id) DO NOTHING
+            ON CONFLICT (id) DO UPDATE
+            SET email = EXCLUDED.email,
+                display_name = EXCLUDED.display_name
             """
         ),
         {
-            "user_id": str(user_id),
-            "email": f"{user_id}@mock.local",
-            "display_name": "Mock User",
+            "user_id": str(user.user_id),
+            "email": email,
+            "display_name": display_name,
         },
     )
 

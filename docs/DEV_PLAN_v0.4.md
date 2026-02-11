@@ -59,6 +59,12 @@
 4. CI:
    - `.github/workflows/backend-tests.yml`
 
+## 3.1 M2 当前进展（已开始）
+
+1. 已实现 Supabase JWT 鉴权能力（支持 JWKS 校验 + `/auth/v1/user` 回退）
+2. 后端支持 `AUTH_MODE=mock|supabase` 双模式切换
+3. 已完成 Supabase Auth 实际 token 的本地集成验证（创建临时用户 -> 登录换 token -> 调用受保护接口）
+
 ## 4. 下一步（按顺序）
 
 1. 确认目标环境已执行 `0002_add_idempotency_keys.sql`

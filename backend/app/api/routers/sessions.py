@@ -68,7 +68,7 @@ async def create_session(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SessionCreateResponse:
-    await ensure_user_exists(db, user.user_id)
+    await ensure_user_exists(db, user)
 
     scene = await get_scene_owned_by_user(db, payload.scene_id, user.user_id)
     if not scene:
@@ -108,7 +108,7 @@ async def create_session_message(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MessageCreateResponse:
-    await ensure_user_exists(db, user.user_id)
+    await ensure_user_exists(db, user)
     session = await get_session_owned_by_user(db, session_id, user.user_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")

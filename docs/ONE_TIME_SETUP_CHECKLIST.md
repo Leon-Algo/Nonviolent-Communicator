@@ -5,6 +5,10 @@
 1. 后端项目已部署到 Vercel  
    - `https://nvc-practice-api.vercel.app`
 2. Vercel 项目已配置核心生产环境变量
+   - 鉴权模式建议:
+     - `AUTH_MODE=supabase`
+     - `MOCK_AUTH_ENABLED=false`
+     - `SUPABASE_ANON_KEY=<anon key>`
 3. 统一本地配置文件已创建  
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/.env`
 4. 后端支持 Mock Token 鉴权与核心 API

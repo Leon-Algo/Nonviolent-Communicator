@@ -8,6 +8,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("LOG_LEVEL", "INFO")
+os.environ.setdefault("AUTH_MODE", "mock")
 os.environ.setdefault("MOCK_AUTH_ENABLED", "true")
 os.environ.setdefault(
     "DATABASE_URL",

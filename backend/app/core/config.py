@@ -10,13 +10,17 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    auth_mode: str = Field(default="mock", alias="AUTH_MODE")
     mock_auth_enabled: bool = Field(default=True, alias="MOCK_AUTH_ENABLED")
 
     database_url: str = Field(alias="DATABASE_URL")
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")
+    supabase_anon_key: str | None = Field(default=None, alias="SUPABASE_ANON_KEY")
     supabase_service_role_key: str | None = Field(
         default=None, alias="SUPABASE_SERVICE_ROLE_KEY"
     )
+    jwt_audience: str = Field(default="authenticated", alias="JWT_AUDIENCE")
+    jwt_issuer: str | None = Field(default=None, alias="JWT_ISSUER")
 
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
     llm_model: str = Field(
@@ -53,9 +57,13 @@ class Settings(BaseSettings):
     @field_validator(
         "app_env",
         "log_level",
+        "auth_mode",
         "database_url",
         "supabase_url",
+        "supabase_anon_key",
         "supabase_service_role_key",
+        "jwt_audience",
+        "jwt_issuer",
         "llm_api_key",
         "llm_model",
         "openai_base_url",
@@ -69,6 +77,16 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return value.strip()
         return value
+
+    @field_validator("auth_mode", mode="before")
+    @classmethod
+    def normalize_auth_mode(cls, value):
+        if not isinstance(value, str):
+            return "mock"
+        normalized = value.strip().lower()
+        if normalized not in {"mock", "supabase"}:
+            return "mock"
+        return normalized
 
     @field_validator("mock_auth_enabled", mode="before")
     @classmethod
