@@ -173,8 +173,29 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
-    except (httpx.HTTPError, KeyError, IndexError, ValueError, json.JSONDecodeError):
+            choices = data.get("choices") if isinstance(data, dict) else None
+            if not isinstance(choices, list) or not choices:
+                return None
+
+            message = choices[0].get("message") if isinstance(choices[0], dict) else None
+            content = message.get("content") if isinstance(message, dict) else None
+
+            if isinstance(content, str):
+                normalized = content.strip()
+                return normalized or None
+
+            if isinstance(content, list):
+                text_parts = []
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        text_value = item.get("text")
+                        if isinstance(text_value, str):
+                            text_parts.append(text_value.strip())
+                merged = " ".join(part for part in text_parts if part)
+                return merged or None
+
+            return None
+    except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError, AttributeError, json.JSONDecodeError):
         return None
 
 

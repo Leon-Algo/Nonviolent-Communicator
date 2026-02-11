@@ -9,6 +9,7 @@ engine = create_async_engine(
     settings.sqlalchemy_database_url,
     poolclass=NullPool,
     pool_pre_ping=True,
+    connect_args={"statement_cache_size": 0},
 )
 
 SessionLocal = async_sessionmaker(

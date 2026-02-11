@@ -157,17 +157,23 @@ async def create_session_message(
     )
 
     new_state = "COMPLETED" if turn >= int(session["target_turns"]) else "ACTIVE"
+    is_completed = new_state == "COMPLETED"
     await db.execute(
         text(
             """
             UPDATE sessions
             SET current_turn = :current_turn,
                 state = :state,
-                ended_at = CASE WHEN :state = 'COMPLETED' THEN NOW() ELSE ended_at END
+                ended_at = CASE WHEN :is_completed THEN NOW() ELSE ended_at END
             WHERE id = :session_id
             """
         ),
-        {"current_turn": turn, "state": new_state, "session_id": str(session_id)},
+        {
+            "current_turn": turn,
+            "state": new_state,
+            "is_completed": is_completed,
+            "session_id": str(session_id),
+        },
     )
     await db.commit()
 
