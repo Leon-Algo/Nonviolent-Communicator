@@ -57,6 +57,13 @@ ORDER BY table_name;
 bash scripts/api_smoke_test.sh https://nvc-practice-api.vercel.app
 ```
 
+前端 Supabase 鉴权联调:
+
+1. 打开 `https://nvc-practice-web.vercel.app`
+2. 连接配置里选择 `Supabase JWT`
+3. 填写 Supabase 邮箱和密码，点击 `Supabase 登录取 Token`
+4. 按顺序点击创建场景、创建会话、发送消息
+
 ## 5. 后续最佳实践建议（等你确认后我再执行）
 
 1. 绑定自有域名
