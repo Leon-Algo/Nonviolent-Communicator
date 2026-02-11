@@ -17,7 +17,8 @@ function setOutput(value) {
   byId("output").textContent = JSON.stringify(value, null, 2);
 }
 
-function getConfig() {
+function getConfig(options = {}) {
+  const { requireAuthToken = true, requireMockUser = true } = options;
   const fallbackBaseUrl = window.location.origin;
   const apiBaseUrl =
     byId("apiBaseUrl").value.trim().replace(/\/+$/, "") || fallbackBaseUrl;
@@ -29,10 +30,10 @@ function getConfig() {
   const supabasePassword = byId("supabasePassword").value;
   const supabaseAccessToken = byId("supabaseAccessToken").value.trim();
 
-  if (authMode === "mock" && !userId) {
+  if (authMode === "mock" && requireMockUser && !userId) {
     throw new Error("Mock User UUID 不能为空");
   }
-  if (authMode === "supabase" && !supabaseAccessToken) {
+  if (authMode === "supabase" && requireAuthToken && !supabaseAccessToken) {
     throw new Error("Supabase 模式需要 Access Token，请先登录或粘贴 token");
   }
 
@@ -77,7 +78,7 @@ async function callApi(url, options) {
 }
 
 async function createScene() {
-  const config = getConfig();
+  const config = getConfig({ requireAuthToken: true });
   const { apiBaseUrl } = config;
   const payload = {
     title: byId("sceneTitle").value.trim(),
@@ -99,7 +100,7 @@ async function createScene() {
 }
 
 async function createSession() {
-  const config = getConfig();
+  const config = getConfig({ requireAuthToken: true });
   const { apiBaseUrl } = config;
   const sceneId = byId("sceneIdValue").textContent.trim();
   if (!sceneId || sceneId === "-") {
@@ -119,7 +120,7 @@ async function createSession() {
 }
 
 async function sendMessage() {
-  const config = getConfig();
+  const config = getConfig({ requireAuthToken: true });
   const { apiBaseUrl } = config;
   const sessionId = byId("sessionIdInput").value.trim();
   if (!sessionId) {
@@ -138,7 +139,8 @@ async function sendMessage() {
 }
 
 async function loginSupabase() {
-  const config = getConfig();
+  const config = getConfig({ requireAuthToken: false, requireMockUser: false });
+  byId("authMode").value = "supabase";
   if (!config.supabaseUrl) {
     throw new Error("请填写 Supabase URL");
   }
@@ -173,6 +175,8 @@ async function loginSupabase() {
   }
 
   byId("supabaseAccessToken").value = data.access_token;
+  localStorage.setItem("auth_mode", "supabase");
+  localStorage.setItem("supabase_email", config.supabaseEmail);
   localStorage.setItem("supabase_access_token", data.access_token);
   setOutput({
     ok: true,
@@ -183,13 +187,67 @@ async function loginSupabase() {
   });
 }
 
+async function signupSupabase() {
+  const config = getConfig({ requireAuthToken: false, requireMockUser: false });
+  byId("authMode").value = "supabase";
+  if (!config.supabaseUrl) {
+    throw new Error("请填写 Supabase URL");
+  }
+  if (!config.supabaseAnonKey) {
+    throw new Error("请填写 Supabase Anon Key");
+  }
+  if (!config.supabaseEmail || !config.supabasePassword) {
+    throw new Error("请填写注册邮箱和密码");
+  }
+
+  const signupUrl = `${config.supabaseUrl}/auth/v1/signup`;
+  const signupRes = await fetch(signupUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: config.supabaseAnonKey,
+    },
+    body: JSON.stringify({
+      email: config.supabaseEmail,
+      password: config.supabasePassword,
+    }),
+  });
+  const signupText = await signupRes.text();
+  let signupData = {};
+  try {
+    signupData = signupText ? JSON.parse(signupText) : {};
+  } catch {
+    signupData = { raw: signupText };
+  }
+
+  if (!signupRes.ok) {
+    throw new Error(`注册失败: ${JSON.stringify(signupData)}`);
+  }
+
+  if (signupData.access_token) {
+    byId("supabaseAccessToken").value = signupData.access_token;
+    localStorage.setItem("auth_mode", "supabase");
+    localStorage.setItem("supabase_email", config.supabaseEmail);
+    localStorage.setItem("supabase_access_token", signupData.access_token);
+    setOutput({
+      ok: true,
+      message: "注册成功，已自动登录",
+      expires_in: signupData.expires_in,
+    });
+    return;
+  }
+
+  // Some Supabase projects require email verification before login.
+  await loginSupabase();
+}
+
 function showError(err) {
   setOutput({ error: String(err?.message || err) });
 }
 
 function saveConfig() {
   localStorage.setItem("api_base_url", byId("apiBaseUrl").value.trim());
-  localStorage.setItem("auth_mode", byId("authMode").value.trim() || "mock");
+  localStorage.setItem("auth_mode", byId("authMode").value.trim() || "supabase");
   localStorage.setItem("mock_user_id", byId("mockUserId").value.trim());
   localStorage.setItem("supabase_url", byId("supabaseUrl").value.trim());
   localStorage.setItem("supabase_anon_key", byId("supabaseAnonKey").value.trim());
@@ -207,7 +265,7 @@ function bind() {
   if (shouldForceProxy) {
     localStorage.setItem("api_base_url", window.location.origin);
   }
-  const authMode = localStorage.getItem("auth_mode") || "mock";
+  const authMode = localStorage.getItem("auth_mode") || "supabase";
   const savedUid = localStorage.getItem("mock_user_id") || ensureUserId();
   const savedSupabaseUrl = localStorage.getItem("supabase_url") || DEFAULT_SUPABASE_URL;
   const savedSupabaseAnonKey =
@@ -233,6 +291,7 @@ function bind() {
     setOutput({ ok: true, message: "已生成新 mock 用户", user_id: uid });
   });
   byId("supabaseLoginBtn").addEventListener("click", () => loginSupabase().catch(showError));
+  byId("supabaseSignupBtn").addEventListener("click", () => signupSupabase().catch(showError));
   byId("clearTokenBtn").addEventListener("click", () => {
     byId("supabaseAccessToken").value = "";
     localStorage.removeItem("supabase_access_token");

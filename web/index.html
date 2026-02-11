@@ -24,35 +24,9 @@
       </header>
 
       <section class="card">
-        <h2>连接配置</h2>
+        <h2>快速测试（2 步）</h2>
+        <p class="meta">先填邮箱和密码，点击“登录并获取 Token”；然后直接创建场景/会话/发送消息。</p>
         <div class="grid two">
-          <label>
-            API Base URL
-            <input id="apiBaseUrl" type="text" value="" placeholder="默认同域代理，不填即可" />
-          </label>
-          <label>
-            鉴权模式
-            <select id="authMode">
-              <option value="mock">Mock</option>
-              <option value="supabase">Supabase JWT</option>
-            </select>
-          </label>
-        </div>
-        <div class="grid two">
-          <label>
-            Mock User UUID
-            <input id="mockUserId" type="text" />
-          </label>
-          <label>
-            Supabase URL
-            <input id="supabaseUrl" type="text" placeholder="https://<project-ref>.supabase.co" />
-          </label>
-        </div>
-        <div class="grid two">
-          <label>
-            Supabase Anon Key
-            <input id="supabaseAnonKey" type="text" placeholder="sb_publishable_..." />
-          </label>
           <label>
             Supabase Email
             <input id="supabaseEmail" type="email" placeholder="test@example.com" />
@@ -69,12 +43,51 @@
           </label>
         </div>
         <div class="actions">
-          <button id="newUserBtn" type="button">生成新用户</button>
-          <button id="supabaseLoginBtn" type="button">Supabase 登录取 Token</button>
-          <button id="clearTokenBtn" type="button" class="secondary">清空 Token</button>
-          <button id="useProxyBtn" type="button">切换同域代理</button>
-          <button id="saveConfigBtn" type="button" class="secondary">保存配置</button>
+          <button id="supabaseSignupBtn" type="button">0) 注册测试账号</button>
+          <button id="supabaseLoginBtn" type="button">1) 登录并获取 Token</button>
+          <button id="clearTokenBtn" type="button" class="secondary">退出登录（清空 Token）</button>
+          <button id="saveConfigBtn" type="button" class="secondary">保存邮箱配置</button>
         </div>
+        <details>
+          <summary>高级配置（一般不用改）</summary>
+          <div class="grid two">
+            <label>
+              API Base URL
+              <input id="apiBaseUrl" type="text" value="" placeholder="默认同域代理，不填即可" />
+            </label>
+            <label>
+              鉴权模式
+              <select id="authMode">
+                <option value="supabase">Supabase JWT</option>
+                <option value="mock">Mock</option>
+              </select>
+            </label>
+          </div>
+          <div class="grid two">
+            <label>
+              Mock User UUID
+              <input id="mockUserId" type="text" />
+            </label>
+            <label>
+              Supabase URL
+              <input id="supabaseUrl" type="text" placeholder="https://<project-ref>.supabase.co" />
+            </label>
+          </div>
+          <div class="grid two">
+            <label>
+              Supabase Anon Key
+              <input id="supabaseAnonKey" type="text" placeholder="sb_publishable_..." />
+            </label>
+            <label>
+              Access Token
+              <input id="supabaseAccessToken" type="text" placeholder="登录后自动填充，或手动粘贴" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="newUserBtn" type="button">生成 Mock 用户</button>
+            <button id="useProxyBtn" type="button">切换同域代理</button>
+          </div>
+        </details>
       </section>
 
       <section class="card">
