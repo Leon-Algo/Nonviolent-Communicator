@@ -51,6 +51,12 @@
 8. M2 回归基础能力增强
    - 新增 DB 集成测试: `backend/tests/test_api_flow_integration.py`
    - 新增 Postgres service CI 流水线配置: `.github/workflows/backend-tests.yml`
+9. 新增可执行验收脚本
+   - RLS 隔离校验: `scripts/rls_isolation_check.sh`
+   - Supabase JWT API 冒烟: `scripts/supabase_jwt_api_smoke_test.sh`
+10. RLS claim 兼容修复迁移
+   - 新增 `db/migrations/0005_fix_request_user_id_claim_resolution.sql`
+   - 兼容 `auth.uid()` 与 `request.jwt.claims` / `request.jwt.claim.sub` 解析路径
 
 ## 5. 验证结果
 

@@ -1,11 +1,8 @@
-from fastapi import Depends, Header
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Header
 
 from app.core.config import settings
 from app.core.security import AuthUser, parse_mock_bearer_token
 from app.core.supabase_auth import verify_supabase_access_token
-from app.db.security import apply_request_rls_context
-from app.db.session import get_db_session
 
 
 async def get_current_user(authorization: str | None = Header(default=None)) -> AuthUser:
@@ -24,9 +21,3 @@ async def get_current_user(authorization: str | None = Header(default=None)) -> 
         return parse_mock_bearer_token(authorization)
     return await verify_supabase_access_token(authorization)
 
-
-async def enforce_db_rls_context(
-    user: AuthUser = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db_session),
-) -> None:
-    await apply_request_rls_context(db, user)

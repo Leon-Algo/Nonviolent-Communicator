@@ -34,6 +34,7 @@
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0002_add_idempotency_keys.sql`
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0003_sync_auth_users_to_public_users.sql`
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0004_enable_rls_core_tables.sql`
+   - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0005_fix_request_user_id_claim_resolution.sql`
 4. 点击 Run
 5. 运行后执行校验 SQL:
 
@@ -58,6 +59,18 @@ ORDER BY table_name;
 
 ```bash
 bash scripts/api_smoke_test.sh https://nvc-practice-api.vercel.app
+```
+
+RLS 隔离验收（Supabase 直连）:
+
+```bash
+bash scripts/rls_isolation_check.sh
+```
+
+Supabase JWT 端到端冒烟（后端 API）:
+
+```bash
+bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
 ```
 
 前端 Supabase 鉴权联调:

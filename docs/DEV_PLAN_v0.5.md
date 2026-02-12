@@ -30,9 +30,11 @@
 当前进展（2026-02-12）:
 
 1. 已新增 `0004_enable_rls_core_tables.sql`（策略草案已落库脚本化）。
-2. 已在后端请求链路注入 DB RLS 上下文（role + jwt sub claim）。
-3. 已加入生产环境 mock 安全阈值校验（默认禁止）。
-4. 待完成: 在目标 Supabase 环境执行 `0004` 并做隔离回归验收。
+2. 已新增 `0005_fix_request_user_id_claim_resolution.sql`（修复 claim 解析兼容性）。
+3. 已在后端请求链路注入 DB RLS 上下文（role + jwt sub claim）。
+4. 已加入生产环境 mock 安全阈值校验（默认禁止）。
+5. 已新增 `scripts/rls_isolation_check.sh` 作为隔离验收脚本。
+6. 待完成: 在目标 Supabase 环境执行 `0004/0005` 并做隔离回归验收。
 
 ### M2 稳定性与可回归（P0）
 
@@ -52,7 +54,8 @@
 
 1. 已新增 DB 集成测试 `test_api_flow_integration.py`（默认按 `RUN_DB_TESTS` 开关执行）。
 2. 已在 CI 增加 Postgres service + 集成测试通道。
-3. 待完成: 增加真实 Supabase JWT 端到端回归脚本并并入发布前 checklist。
+3. 已新增 `scripts/supabase_jwt_api_smoke_test.sh` 作为 JWT 端到端回归脚本。
+4. 待完成: 将 JWT 回归脚本并入发布前 checklist。
 
 ### M3 产品可用性（P1）
 

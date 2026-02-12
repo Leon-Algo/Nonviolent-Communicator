@@ -21,6 +21,7 @@ MIGRATIONS = [
     ROOT_DIR / "db" / "migrations" / "0001_init_nvc_practice.sql",
     ROOT_DIR / "db" / "migrations" / "0002_add_idempotency_keys.sql",
     ROOT_DIR / "db" / "migrations" / "0004_enable_rls_core_tables.sql",
+    ROOT_DIR / "db" / "migrations" / "0005_fix_request_user_id_claim_resolution.sql",
 ]
 TABLES_TO_TRUNCATE = [
     "idempotency_keys",
