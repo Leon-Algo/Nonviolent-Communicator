@@ -57,6 +57,9 @@
 10. RLS claim 兼容修复迁移
    - 新增 `db/migrations/0005_fix_request_user_id_claim_resolution.sql`
    - 兼容 `auth.uid()` 与 `request.jwt.claims` / `request.jwt.claim.sub` 解析路径
+11. 发布前预检自动化
+   - 新增 `scripts/release_preflight.sh`
+   - 串联单测、脚本语法检查、RLS 隔离校验与 JWT API 冒烟
 
 ## 5. 验证结果
 

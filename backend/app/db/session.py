@@ -5,12 +5,17 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
-engine = create_async_engine(
-    settings.sqlalchemy_database_url,
-    poolclass=NullPool,
-    pool_pre_ping=True,
-    connect_args={"statement_cache_size": 0},
-)
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "connect_args": {"statement_cache_size": 0},
+}
+
+# Keep NullPool in production/serverless to avoid stale pooled connections.
+# Use default pooling in non-production to improve local/dev stability for multi-step flows.
+if settings.app_env.lower() == "production":
+    engine_kwargs["poolclass"] = NullPool
+
+engine = create_async_engine(settings.sqlalchemy_database_url, **engine_kwargs)
 
 SessionLocal = async_sessionmaker(
     bind=engine,

@@ -45,6 +45,7 @@ RLS/JWT smoke scripts (repo root):
 ```bash
 bash scripts/rls_isolation_check.sh
 bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
+bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
 
 6. Auth mode switch:
@@ -97,6 +98,9 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - AI generation supports ModelScope OpenAI-compatible API with local fallback
 - Unified error response contract (`error_code`, `message`, `request_id`)
 - Message API idempotency support (`client_message_id`)
+- DB pooling strategy:
+  - production: `NullPool` (serverless-safe)
+  - non-production: default pooled connections (better local stability)
 
 ## Required DB Migrations
 

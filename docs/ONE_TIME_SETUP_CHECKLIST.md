@@ -73,6 +73,12 @@ Supabase JWT 端到端冒烟（后端 API）:
 bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
 ```
 
+发布前一键预检:
+
+```bash
+bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+```
+
 前端 Supabase 鉴权联调:
 
 1. 打开 `https://nvc-practice-web.vercel.app`
