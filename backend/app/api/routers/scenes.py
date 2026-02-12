@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
+from app.db.security import apply_request_rls_context
 from app.db.utils import ensure_user_exists
 from app.core.security import AuthUser
 from app.schemas.scenes import SceneCreateRequest, SceneCreateResponse
@@ -19,6 +20,7 @@ async def create_scene(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SceneCreateResponse:
+    await apply_request_rls_context(db, user)
     await ensure_user_exists(db, user)
 
     result = await db.execute(

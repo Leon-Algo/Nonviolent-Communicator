@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
+from app.db.security import apply_request_rls_context
 from app.core.security import AuthUser
 from app.schemas.progress import WeeklyProgressResponse
 
@@ -18,6 +19,7 @@ async def get_weekly_progress(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> WeeklyProgressResponse:
+    await apply_request_rls_context(db, user)
     week_end = week_start + timedelta(days=7)
 
     metrics_result = await db.execute(

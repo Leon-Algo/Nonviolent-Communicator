@@ -171,6 +171,10 @@ pre {
   font-size: 12px;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 @keyframes rise {
   from {
     transform: translateY(8px);

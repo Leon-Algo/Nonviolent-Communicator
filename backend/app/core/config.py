@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     auth_mode: str = Field(default="mock", alias="AUTH_MODE")
     mock_auth_enabled: bool = Field(default=True, alias="MOCK_AUTH_ENABLED")
+    allow_mock_auth_in_production: bool = Field(
+        default=False, alias="ALLOW_MOCK_AUTH_IN_PRODUCTION"
+    )
 
     database_url: str = Field(alias="DATABASE_URL")
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")
@@ -100,6 +103,32 @@ class Settings(BaseSettings):
             if normalized in {"0", "false", "no", "off"}:
                 return False
         return value
+
+    @field_validator("allow_mock_auth_in_production", mode="before")
+    @classmethod
+    def parse_allow_mock_auth_in_production(cls, value):
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off"}:
+                return False
+        return value
+
+    @model_validator(mode="after")
+    def enforce_prod_auth_constraints(self):
+        if (
+            self.app_env.lower() == "production"
+            and self.mock_auth_enabled
+            and not self.allow_mock_auth_in_production
+        ):
+            raise ValueError(
+                "MOCK_AUTH_ENABLED must be false in production "
+                "(or set ALLOW_MOCK_AUTH_IN_PRODUCTION=true for emergency override)"
+            )
+        return self
 
 
 settings = Settings()

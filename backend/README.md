@@ -34,6 +34,12 @@ curl http://127.0.0.1:8000/health
 pytest tests -q
 ```
 
+DB-backed integration tests (requires local Postgres):
+
+```bash
+RUN_DB_TESTS=1 pytest tests/test_api_flow_integration.py -q
+```
+
 6. Auth mode switch:
 
 ```bash
@@ -42,6 +48,14 @@ AUTH_MODE=mock
 
 # Supabase JWT auth
 AUTH_MODE=supabase
+```
+
+Production guard:
+
+```bash
+# keep false in production
+MOCK_AUTH_ENABLED=false
+ALLOW_MOCK_AUTH_IN_PRODUCTION=false
 ```
 
 5. Mock auth token format:
@@ -83,6 +97,8 @@ Run in order:
 
 1. `db/migrations/0001_init_nvc_practice.sql`
 2. `db/migrations/0002_add_idempotency_keys.sql`
+3. `db/migrations/0003_sync_auth_users_to_public_users.sql`
+4. `db/migrations/0004_enable_rls_core_tables.sql`
 
 ## Next Implementation Steps
 

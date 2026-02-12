@@ -1,0 +1,83 @@
+# 阶段复盘（2026-02-12）
+
+## 1. 复盘范围
+
+- 复盘日期: 2026-02-12
+- 覆盖阶段: 鉴权链路稳定化 + Supabase 注册链路修复 + 联调体验收敛
+- 目标: 从“多模式临时联调”收敛到“线上仅 Supabase 的可测试路径”
+
+## 2. 本阶段关键结论
+
+1. 线上测试主链路确定为 `Supabase 注册/登录 -> JWT 调业务接口`。
+2. Mock 模式保留给本地开发，不再作为线上测试入口。
+3. Supabase 注册后用户数据已可自动同步到业务表 `public.users`。
+
+## 3. 关键问题与根因
+
+1. 注册报错 `429 over_email_send_rate_limit`
+   - 根因: Supabase Auth 邮件发送频控触发，导致注册流程中断。
+2. Mock 模式报错 `401 invalid or expired access token`
+   - 根因: 在线上 `AUTH_MODE=supabase` 路径下，mock token 回退策略与环境开关不一致，导致请求进入 Supabase JWT 校验。
+3. 前端测试入口复杂
+   - 根因: 联调期保留了过多 mock/supabase 双模式控件，普通测试用户容易误操作。
+
+## 4. 已实施修复
+
+1. 后端鉴权回退能力与边界测试
+   - `backend/app/api/deps.py`
+   - `backend/tests/test_auth_deps.py`
+2. 前端注册/登录容错增强
+   - 注册遇到 429 时优先尝试同邮箱直接登录
+   - token 失效错误提示更明确
+   - 文件: `web/app.js`
+3. 用户同步机制上线
+   - 新增迁移: `db/migrations/0003_sync_auth_users_to_public_users.sql`
+   - 作用: `auth.users` 新增或更新后自动 upsert 到 `public.users`，并回填历史用户
+4. 线上入口收敛
+   - 线上隐藏 Mock 相关 UI，仅展示 Supabase 流程
+   - 本地可通过 `localhost/127.0.0.1` 或 `?dev=1` 显示开发入口
+   - 文件: `web/index.html`, `web/app.js`, `web/styles.css`
+5. 冒烟脚本可靠性加强
+   - `scripts/api_smoke_test.sh` 由“弱校验”改为“非 2xx 立即失败”
+6. M1 安全基线首版落地
+   - 新增迁移: `db/migrations/0004_enable_rls_core_tables.sql`
+   - 覆盖核心表 RLS policy（users/scenes/sessions/messages/feedback/rewrites/summaries/reflections/event_logs/idempotency_keys）
+   - 应用侧新增每请求 DB 上下文注入：`SET LOCAL ROLE authenticated` + `request.jwt.claim.sub`
+   - 文件: `backend/app/db/security.py` + 相关 router
+7. 生产环境 Mock 安全阈值
+   - 新增配置约束：生产环境默认禁止 `MOCK_AUTH_ENABLED=true`
+   - 紧急回滚可通过 `ALLOW_MOCK_AUTH_IN_PRODUCTION=true` 显式开启
+   - 文件: `backend/app/core/config.py`
+8. M2 回归基础能力增强
+   - 新增 DB 集成测试: `backend/tests/test_api_flow_integration.py`
+   - 新增 Postgres service CI 流水线配置: `.github/workflows/backend-tests.yml`
+
+## 5. 验证结果
+
+1. 后端自动化测试通过: `pytest backend/tests -q` -> `18 passed, 2 skipped`
+2. 前端脚本语法通过: `node --check web/app.js`
+3. Supabase 实测链路通过:
+   - signup 200
+   - password login 200
+   - `/auth/v1/user` 200
+   - `public.users` 可查到新增用户
+4. 新增 M2 DB 集成测试可在 CI 路径运行（本地默认跳过，需 `RUN_DB_TESTS=1`）
+
+## 6. 当前状态评估
+
+- 目前系统已具备“真实用户注册 + 登录 + 业务接口联调”的连续路径。
+- 线上入口认知成本下降，后续用户测试可以只围绕 Supabase 主链路执行。
+
+## 7. 遗留风险
+
+1. 还未完成 RLS 在线验证闭环（需要在目标 Supabase 项目执行 `0004` 并做隔离回归）。
+2. 线上稳定性观测仍较薄弱（缺统一日志聚合与错误告警）。
+3. 公开测试前仍需完成密钥轮换与脱敏。
+4. 本地 DB 集成测试依赖 Docker 环境，开发机需保持 daemon 可用。
+
+## 8. 下一阶段重点
+
+1. 在 Supabase 生产/测试环境执行 `0004` 并完成用户隔离验证（A/B 用户交叉访问回归）。
+2. 补充真实 Supabase JWT 端到端回归脚本，纳入发布检查清单。
+3. 将前端从“联调台”升级到“用户可理解的练习流程页”。
+4. 增加最小可观测性（请求链路、关键异常、基础告警）。

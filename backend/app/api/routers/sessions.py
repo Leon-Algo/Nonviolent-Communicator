@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
+from app.db.security import apply_request_rls_context
 from app.db.utils import ensure_user_exists, get_scene_owned_by_user, get_session_owned_by_user
 from app.core.security import AuthUser
 from app.schemas.sessions import (
@@ -68,6 +69,7 @@ async def create_session(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SessionCreateResponse:
+    await apply_request_rls_context(db, user)
     await ensure_user_exists(db, user)
 
     scene = await get_scene_owned_by_user(db, payload.scene_id, user.user_id)
@@ -108,6 +110,7 @@ async def create_session_message(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MessageCreateResponse:
+    await apply_request_rls_context(db, user)
     await ensure_user_exists(db, user)
     session = await get_session_owned_by_user(db, session_id, user.user_id)
     if not session:
@@ -280,6 +283,7 @@ async def rewrite_session_message(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> RewriteCreateResponse:
+    await apply_request_rls_context(db, user)
     session = await get_session_owned_by_user(db, session_id, user.user_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")
@@ -332,6 +336,7 @@ async def create_session_summary(
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SummaryCreateResponse:
+    await apply_request_rls_context(db, user)
     session = await get_session_owned_by_user(db, session_id, user.user_id)
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")

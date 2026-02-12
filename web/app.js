@@ -5,6 +5,19 @@ function byId(id) {
 const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
 
+function isDevContext() {
+  const host = window.location.hostname || "";
+  const query = new URLSearchParams(window.location.search);
+  return (
+    query.get("dev") === "1" ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".local")
+  );
+}
+
+const DEV_CONTEXT = isDevContext();
+
 function ensureUserId() {
   const existing = localStorage.getItem("mock_user_id");
   if (existing) return existing;
@@ -15,6 +28,40 @@ function ensureUserId() {
 
 function setOutput(value) {
   byId("output").textContent = JSON.stringify(value, null, 2);
+}
+
+function applyModeVisibility() {
+  document.querySelectorAll("[data-dev-only]").forEach((el) => {
+    el.classList.toggle("is-hidden", !DEV_CONTEXT);
+  });
+}
+
+function refreshAuthModeBadge() {
+  byId("currentAuthMode").textContent = byId("authMode").value || "supabase";
+}
+
+function setAuthMode(mode) {
+  byId("authMode").value = mode;
+  localStorage.setItem("auth_mode", mode);
+  refreshAuthModeBadge();
+}
+
+function switchToMockMode(reason) {
+  if (!DEV_CONTEXT) {
+    throw new Error("线上已禁用 Mock 模式，请使用 Supabase 登录");
+  }
+  const uid = byId("mockUserId").value.trim() || crypto.randomUUID();
+  byId("mockUserId").value = uid;
+  localStorage.setItem("mock_user_id", uid);
+  setAuthMode("mock");
+  if (reason) {
+    setOutput({
+      warning: reason,
+      next_step: "直接点击“创建场景”即可继续联调。",
+      mock_user_id: uid,
+    });
+  }
+  return uid;
 }
 
 function getConfig(options = {}) {
@@ -138,19 +185,7 @@ async function sendMessage() {
   setOutput(data);
 }
 
-async function loginSupabase() {
-  const config = getConfig({ requireAuthToken: false, requireMockUser: false });
-  byId("authMode").value = "supabase";
-  if (!config.supabaseUrl) {
-    throw new Error("请填写 Supabase URL");
-  }
-  if (!config.supabaseAnonKey) {
-    throw new Error("请填写 Supabase Anon Key");
-  }
-  if (!config.supabaseEmail || !config.supabasePassword) {
-    throw new Error("请填写 Supabase 邮箱和密码");
-  }
-
+async function fetchSupabasePasswordToken(config) {
   const url = `${config.supabaseUrl}/auth/v1/token?grant_type=password`;
   const res = await fetch(url, {
     method: "POST",
@@ -173,23 +208,42 @@ async function loginSupabase() {
   if (!res.ok || !data.access_token) {
     throw new Error(`Supabase 登录失败: ${JSON.stringify(data)}`);
   }
+  return data;
+}
 
-  byId("supabaseAccessToken").value = data.access_token;
-  localStorage.setItem("auth_mode", "supabase");
+function persistSupabaseSession(config, session, message) {
+  byId("supabaseAccessToken").value = session.access_token;
+  setAuthMode("supabase");
   localStorage.setItem("supabase_email", config.supabaseEmail);
-  localStorage.setItem("supabase_access_token", data.access_token);
+  localStorage.setItem("supabase_access_token", session.access_token);
   setOutput({
     ok: true,
-    message: "已获取 Supabase Access Token",
-    token_type: data.token_type,
-    expires_in: data.expires_in,
-    refresh_token_exists: Boolean(data.refresh_token),
+    message,
+    token_type: session.token_type,
+    expires_in: session.expires_in,
+    refresh_token_exists: Boolean(session.refresh_token),
   });
+}
+
+async function loginSupabase() {
+  const config = getConfig({ requireAuthToken: false, requireMockUser: false });
+  setAuthMode("supabase");
+  if (!config.supabaseUrl) {
+    throw new Error("请填写 Supabase URL");
+  }
+  if (!config.supabaseAnonKey) {
+    throw new Error("请填写 Supabase Anon Key");
+  }
+  if (!config.supabaseEmail || !config.supabasePassword) {
+    throw new Error("请填写 Supabase 邮箱和密码");
+  }
+  const data = await fetchSupabasePasswordToken(config);
+  persistSupabaseSession(config, data, "已获取 Supabase Access Token");
 }
 
 async function signupSupabase() {
   const config = getConfig({ requireAuthToken: false, requireMockUser: false });
-  byId("authMode").value = "supabase";
+  setAuthMode("supabase");
   if (!config.supabaseUrl) {
     throw new Error("请填写 Supabase URL");
   }
@@ -221,12 +275,39 @@ async function signupSupabase() {
   }
 
   if (!signupRes.ok) {
+    if (
+      signupRes.status === 429 ||
+      signupData?.error_code === "over_email_send_rate_limit" ||
+      String(signupData?.msg || "").includes("email rate limit exceeded")
+    ) {
+      try {
+        const loginData = await fetchSupabasePasswordToken(config);
+        persistSupabaseSession(
+          config,
+          loginData,
+          "注册触发邮件限流，但检测到该邮箱可直接登录，已自动登录。"
+        );
+        return;
+      } catch {
+        if (!DEV_CONTEXT) {
+          setOutput({
+            error: "注册触发邮件限流，且该邮箱当前无法直接登录。",
+            hint: "请稍后重试，或更换邮箱继续；开发期可用 ?dev=1 开启 Mock 快测。",
+          });
+          return;
+        }
+        switchToMockMode(
+          "Supabase 注册触发邮件限流，且当前邮箱无法直接登录。已切到 Mock 模式。若要继续真实注册，请在 Supabase 控制台临时关闭 Email Confirm 后再试。"
+        );
+        return;
+      }
+    }
     throw new Error(`注册失败: ${JSON.stringify(signupData)}`);
   }
 
   if (signupData.access_token) {
     byId("supabaseAccessToken").value = signupData.access_token;
-    localStorage.setItem("auth_mode", "supabase");
+    setAuthMode("supabase");
     localStorage.setItem("supabase_email", config.supabaseEmail);
     localStorage.setItem("supabase_access_token", signupData.access_token);
     setOutput({
@@ -242,12 +323,38 @@ async function signupSupabase() {
 }
 
 function showError(err) {
-  setOutput({ error: String(err?.message || err) });
+  const msg = String(err?.message || err);
+  const authMode = byId("authMode")?.value || "supabase";
+  if (authMode === "mock" && msg.includes("\"error_code\":\"UNAUTHORIZED\"")) {
+    setOutput({
+      error: msg,
+      hint: "当前后端可能关闭了 Mock 鉴权（MOCK_AUTH_ENABLED=false）。开发联调请开启它，或改用 Supabase 登录模式。",
+    });
+    return;
+  }
+  if (msg.includes("invalid or expired access token") && authMode === "supabase") {
+    if (!DEV_CONTEXT) {
+      setOutput({
+        error: msg,
+        hint: "Supabase token 无效或过期，请重新点击“登录并获取 Token”。",
+      });
+      return;
+    }
+    const uid = switchToMockMode();
+    setOutput({
+      error: msg,
+      hint: "Supabase token 无效或过期，已自动切换到 Mock 模式让你不中断测试。",
+      mock_user_id: uid,
+      next_step: "可继续创建场景/会话；也可重新登录后再切回 Supabase。",
+    });
+    return;
+  }
+  setOutput({ error: msg });
 }
 
 function saveConfig() {
   localStorage.setItem("api_base_url", byId("apiBaseUrl").value.trim());
-  localStorage.setItem("auth_mode", byId("authMode").value.trim() || "supabase");
+  setAuthMode(byId("authMode").value.trim() || "supabase");
   localStorage.setItem("mock_user_id", byId("mockUserId").value.trim());
   localStorage.setItem("supabase_url", byId("supabaseUrl").value.trim());
   localStorage.setItem("supabase_anon_key", byId("supabaseAnonKey").value.trim());
@@ -257,6 +364,7 @@ function saveConfig() {
 }
 
 function bind() {
+  applyModeVisibility();
   const savedApiRaw = localStorage.getItem("api_base_url");
   const shouldForceProxy =
     !savedApiRaw ||
@@ -265,7 +373,9 @@ function bind() {
   if (shouldForceProxy) {
     localStorage.setItem("api_base_url", window.location.origin);
   }
-  const authMode = localStorage.getItem("auth_mode") || "supabase";
+  const authMode = DEV_CONTEXT
+    ? localStorage.getItem("auth_mode") || "supabase"
+    : "supabase";
   const savedUid = localStorage.getItem("mock_user_id") || ensureUserId();
   const savedSupabaseUrl = localStorage.getItem("supabase_url") || DEFAULT_SUPABASE_URL;
   const savedSupabaseAnonKey =
@@ -279,17 +389,28 @@ function bind() {
   byId("supabaseAnonKey").value = savedSupabaseAnonKey;
   byId("supabaseEmail").value = savedSupabaseEmail;
   byId("supabaseAccessToken").value = savedSupabaseAccessToken;
+  if (!DEV_CONTEXT) {
+    setAuthMode("supabase");
+  }
+  refreshAuthModeBadge();
 
-  byId("newUserBtn").addEventListener("click", () => {
-    if (byId("authMode").value === "supabase") {
-      setOutput({ error: "当前是 Supabase 模式，不需要生成 mock 用户" });
-      return;
-    }
-    const uid = crypto.randomUUID();
-    byId("mockUserId").value = uid;
-    localStorage.setItem("mock_user_id", uid);
-    setOutput({ ok: true, message: "已生成新 mock 用户", user_id: uid });
-  });
+  if (DEV_CONTEXT) {
+    byId("newUserBtn").addEventListener("click", () => {
+      const uid = switchToMockMode();
+      setOutput({ ok: true, message: "已生成新 mock 用户", user_id: uid });
+    });
+    byId("useMockModeBtn").addEventListener("click", () => {
+      const uid = switchToMockMode();
+      setOutput({ ok: true, message: "已切换到 Mock 模式", user_id: uid });
+    });
+    byId("useSupabaseModeBtn").addEventListener("click", () => {
+      setAuthMode("supabase");
+      setOutput({ ok: true, message: "已切换到 Supabase 模式，请先登录获取 token" });
+    });
+    byId("authMode").addEventListener("change", () => {
+      setAuthMode(byId("authMode").value || "supabase");
+    });
+  }
   byId("supabaseLoginBtn").addEventListener("click", () => loginSupabase().catch(showError));
   byId("supabaseSignupBtn").addEventListener("click", () => signupSupabase().catch(showError));
   byId("clearTokenBtn").addEventListener("click", () => {

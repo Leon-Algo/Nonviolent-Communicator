@@ -6,6 +6,27 @@ USER_ID="${2:-8a4c3f2a-2f88-4c74-9bc0-3123d26df302}"
 AUTH_HEADER="Authorization: Bearer mock_${USER_ID}"
 CONTENT_TYPE="Content-Type: application/json"
 
+request_json() {
+  local method="$1"
+  local url="$2"
+  local payload="$3"
+  local response
+  local body
+  local status
+
+  response="$(curl -sS -w '\n%{http_code}' -X "${method}" "${url}" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${payload}")"
+  body="${response%$'\n'*}"
+  status="${response##*$'\n'}"
+
+  if [[ "${status}" -lt 200 || "${status}" -ge 300 ]]; then
+    echo "${body}" | jq .
+    echo "Request failed: ${method} ${url} -> HTTP ${status}" >&2
+    exit 1
+  fi
+
+  echo "${body}"
+}
+
 echo "Using BASE_URL=${BASE_URL}"
 echo "Using mock user=${USER_ID}"
 
@@ -21,13 +42,13 @@ create_scene_payload='{
 }'
 
 echo "[1/4] create scene"
-scene_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/scenes" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_scene_payload}")"
+scene_resp="$(request_json "POST" "${BASE_URL}/api/v1/scenes" "${create_scene_payload}")"
 echo "${scene_resp}" | jq .
 scene_id="$(echo "${scene_resp}" | jq -r '.scene_id')"
 
 echo "[2/4] create session"
 create_session_payload="$(jq -n --arg sid "${scene_id}" '{"scene_id":$sid,"target_turns":6}')"
-session_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_session_payload}")"
+session_resp="$(request_json "POST" "${BASE_URL}/api/v1/sessions" "${create_session_payload}")"
 echo "${session_resp}" | jq .
 session_id="$(echo "${session_resp}" | jq -r '.session_id')"
 
@@ -36,12 +57,12 @@ create_message_payload='{
   "client_message_id":"4c16e607-2c2f-4a89-bf20-4a33317b640a",
   "content":"你们总是拖延，根本不专业。"
 }'
-message_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions/${session_id}/messages" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_message_payload}")"
+message_resp="$(request_json "POST" "${BASE_URL}/api/v1/sessions/${session_id}/messages" "${create_message_payload}")"
 echo "${message_resp}" | jq .
 first_user_message_id="$(echo "${message_resp}" | jq -r '.user_message_id')"
 
 echo "[4/4] retry same client_message_id (idempotency check)"
-retry_resp="$(curl -sS -X POST "${BASE_URL}/api/v1/sessions/${session_id}/messages" -H "${AUTH_HEADER}" -H "${CONTENT_TYPE}" -d "${create_message_payload}")"
+retry_resp="$(request_json "POST" "${BASE_URL}/api/v1/sessions/${session_id}/messages" "${create_message_payload}")"
 echo "${retry_resp}" | jq .
 retry_user_message_id="$(echo "${retry_resp}" | jq -r '.user_message_id')"
 

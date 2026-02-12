@@ -7,7 +7,8 @@
 2. Vercel 项目已配置核心生产环境变量
    - 鉴权模式建议:
      - `AUTH_MODE=supabase`
-     - `MOCK_AUTH_ENABLED=false`
+     - `MOCK_AUTH_ENABLED=false`（线上仅 Supabase）
+     - `ALLOW_MOCK_AUTH_IN_PRODUCTION=false`
      - `SUPABASE_ANON_KEY=<anon key>`
 3. 统一本地配置文件已创建  
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/.env`
@@ -31,6 +32,8 @@
 3. 粘贴文件内容:
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0001_init_nvc_practice.sql`
    - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0002_add_idempotency_keys.sql`
+   - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0003_sync_auth_users_to_public_users.sql`
+   - `/Users/leon/Documents/CodeProject/Nonviolent-Communicator/db/migrations/0004_enable_rls_core_tables.sql`
 4. 点击 Run
 5. 运行后执行校验 SQL:
 
@@ -60,9 +63,11 @@ bash scripts/api_smoke_test.sh https://nvc-practice-api.vercel.app
 前端 Supabase 鉴权联调:
 
 1. 打开 `https://nvc-practice-web.vercel.app`
-2. 连接配置里选择 `Supabase JWT`
-3. 填写 Supabase 邮箱和密码，点击 `Supabase 登录取 Token`
-4. 按顺序点击创建场景、创建会话、发送消息
+2. 填写 Supabase 邮箱和密码，点击 `登录并获取 Token`
+3. 按顺序点击创建场景、创建会话、发送消息
+4. 线上默认仅开放 Supabase 模式，Mock 入口已隐藏
+5. 若本地开发需要 Mock 联调，可在 URL 加 `?dev=1` 或使用 localhost
+6. 若你要持续做“真实邮箱注册”联调，建议在 Supabase 控制台临时关闭 Email Confirm（开发期），避免邮件发送限流
 
 ## 5. 后续最佳实践建议（等你确认后我再执行）
 
@@ -71,3 +76,4 @@ bash scripts/api_smoke_test.sh https://nvc-practice-api.vercel.app
    - `api.leonalgo.site` -> 后端
 2. 上线前再做密钥轮换与脱敏
 3. 开启 Supabase RLS（公开测试前必须做）
+4. RLS 上线后，建议后端请求启用 `SET LOCAL ROLE authenticated + request.jwt.claim.sub`（代码已实现）
