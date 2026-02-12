@@ -59,18 +59,24 @@
    - 兼容 `auth.uid()` 与 `request.jwt.claims` / `request.jwt.claim.sub` 解析路径
 11. 发布前预检自动化
    - 新增 `scripts/release_preflight.sh`
-   - 串联单测、脚本语法检查、RLS 隔离校验与 JWT API 冒烟
+   - 串联单测/集成测试（`RUN_DB_TESTS=1`）、脚本语法检查、RLS 隔离校验与 JWT API 冒烟
+12. CI 手动预检入口
+   - 新增 `.github/workflows/release-preflight.yml`
+   - 支持手动选择是否执行 RLS 隔离和远端 API 冒烟
 
 ## 5. 验证结果
 
-1. 后端自动化测试通过: `pytest backend/tests -q` -> `18 passed, 2 skipped`
-2. 前端脚本语法通过: `node --check web/app.js`
-3. Supabase 实测链路通过:
+1. 后端自动化测试通过: `pytest backend/tests -q` -> `17 passed, 2 skipped`
+2. 一键预检通过（本地）: `SKIP_REMOTE_API_SMOKE=1 bash scripts/release_preflight.sh`
+3. 前端脚本语法通过: `node --check web/app.js`
+4. Supabase 实测链路通过:
    - signup 200
    - password login 200
    - `/auth/v1/user` 200
    - `public.users` 可查到新增用户
-4. 新增 M2 DB 集成测试可在 CI 路径运行（本地默认跳过，需 `RUN_DB_TESTS=1`）
+5. RLS 隔离脚本通过: `bash scripts/rls_isolation_check.sh`
+6. 新增 M2 DB 集成测试可在 CI 路径运行（本地默认跳过，需 `RUN_DB_TESTS=1`）
+7. 远端 API 冒烟在当前执行环境存在网络不可达（`nvc-practice-api.vercel.app:443` 超时），建议在开发机或 GitHub Actions 手动 workflow 执行。
 
 ## 6. 当前状态评估
 
@@ -79,10 +85,10 @@
 
 ## 7. 遗留风险
 
-1. 还未完成 RLS 在线验证闭环（需要在目标 Supabase 项目执行 `0004` 并做隔离回归）。
-2. 线上稳定性观测仍较薄弱（缺统一日志聚合与错误告警）。
-3. 公开测试前仍需完成密钥轮换与脱敏。
-4. 本地 DB 集成测试依赖 Docker 环境，开发机需保持 daemon 可用。
+1. 线上稳定性观测仍较薄弱（缺统一日志聚合与错误告警）。
+2. 公开测试前仍需完成密钥轮换与脱敏。
+3. 本地 DB 集成测试依赖 Docker 环境，开发机需保持 daemon 可用。
+4. 远端 API 冒烟受执行环境网络约束，需在可达环境补跑并存档结果。
 
 ## 8. 下一阶段重点
 

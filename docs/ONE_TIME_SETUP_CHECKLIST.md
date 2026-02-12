@@ -24,6 +24,10 @@
    - 用于执行首个迁移脚本
 3. 前端代码仓（或目录）准备好后告诉我
    - 我会按同样方式部署 `web` 项目并配置 CORS
+4. （可选）若要启用 GitHub 手动预检流水线
+   - 在 GitHub 仓库 Secrets 配置:
+     - `SUPABASE_URL`
+     - `SUPABASE_ANON_KEY`
 
 ## 3. 最简单迁移方式（推荐）
 
@@ -78,6 +82,12 @@ bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
 ```bash
 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
+
+GitHub 手动预检:
+
+- Workflow: `.github/workflows/release-preflight.yml`
+- 触发方式: Actions -> `release-preflight` -> Run workflow
+- 默认包含 Postgres 集成测试（`RUN_DB_TESTS=1`）
 
 前端 Supabase 鉴权联调:
 

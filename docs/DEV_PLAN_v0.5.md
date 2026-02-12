@@ -55,7 +55,8 @@
 1. 已新增 DB 集成测试 `test_api_flow_integration.py`（默认按 `RUN_DB_TESTS` 开关执行）。
 2. 已在 CI 增加 Postgres service + 集成测试通道。
 3. 已新增 `scripts/supabase_jwt_api_smoke_test.sh` 作为 JWT 端到端回归脚本。
-4. 已新增 `scripts/release_preflight.sh` 将单测 + RLS + JWT 回归串联为发布前预检。
+4. 已新增 `scripts/release_preflight.sh` 将单测/集成测试（`RUN_DB_TESTS=1`）+ RLS + JWT 回归串联为发布前预检。
+5. 已新增 GitHub 手动预检 workflow：`.github/workflows/release-preflight.yml`。
 
 ### M3 产品可用性（P1）
 

@@ -46,7 +46,16 @@ RLS/JWT smoke scripts (repo root):
 bash scripts/rls_isolation_check.sh
 bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+# include DB integration tests in preflight
+RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
+
+CI manual preflight:
+
+- Workflow: `.github/workflows/release-preflight.yml`
+- Requires repo secrets for online checks:
+  - `SUPABASE_URL`
+  - `SUPABASE_ANON_KEY`
 
 6. Auth mode switch:
 
