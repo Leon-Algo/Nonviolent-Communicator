@@ -10,9 +10,10 @@ engine_kwargs = {
     "connect_args": {"statement_cache_size": 0},
 }
 
-# Keep NullPool in production/serverless to avoid stale pooled connections.
-# Use default pooling in non-production to improve local/dev stability for multi-step flows.
-if settings.app_env.lower() == "production":
+# Keep NullPool in production/test to avoid serverless stale connections and
+# test event-loop cross-contamination in asyncpg.
+# Use default pooling in development for better local multi-step stability.
+if settings.app_env.lower() in {"production", "test"}:
     engine_kwargs["poolclass"] = NullPool
 
 engine = create_async_engine(settings.sqlalchemy_database_url, **engine_kwargs)
