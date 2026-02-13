@@ -61,6 +61,35 @@ paths:
             type: integer
             minimum: 0
             default: 0
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+            enum: [ACTIVE, COMPLETED, ABANDONED]
+          description: Filter by session state
+        - in: query
+          name: keyword
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 80
+          description: Keyword search in scene title/goal/context and latest turn messages
+        - in: query
+          name: created_from
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Inclusive start date (YYYY-MM-DD)
+        - in: query
+          name: created_to
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Inclusive end date (YYYY-MM-DD)
       responses:
         '200':
           description: Session history list

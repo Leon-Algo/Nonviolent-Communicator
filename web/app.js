@@ -55,6 +55,7 @@ const state = {
   sceneId: "",
   sessionId: "",
   turn: 0,
+  selectedTurn: 0,
   lastUserMessageId: "",
   history: [],
   summary: null,
@@ -175,6 +176,7 @@ function persistRuntimeState() {
       sceneId: state.sceneId,
       sessionId: state.sessionId,
       turn: state.turn,
+      selectedTurn: state.selectedTurn,
       lastUserMessageId: state.lastUserMessageId,
       history: state.history,
       summary: state.summary,
@@ -192,6 +194,7 @@ function hydrateRuntimeState() {
   state.sceneId = parsed.sceneId || "";
   state.sessionId = parsed.sessionId || "";
   state.turn = Number(parsed.turn || 0);
+  state.selectedTurn = Number(parsed.selectedTurn || 0);
   state.lastUserMessageId = parsed.lastUserMessageId || "";
   state.history = Array.isArray(parsed.history) ? parsed.history : [];
   state.summary = parsed.summary || null;
@@ -202,6 +205,7 @@ function resetRuntimeState() {
   state.sceneId = "";
   state.sessionId = "";
   state.turn = 0;
+  state.selectedTurn = 0;
   state.lastUserMessageId = "";
   state.history = [];
   state.summary = null;
@@ -359,6 +363,7 @@ function formatOfnr(dimension) {
 function renderHistory() {
   const container = byId("conversationList");
   container.innerHTML = "";
+  renderTurnJumpOptions();
 
   if (!state.history.length) {
     const empty = document.createElement("p");
@@ -371,6 +376,10 @@ function renderHistory() {
   state.history.forEach((item) => {
     const card = document.createElement("article");
     card.className = "turn-card";
+    card.id = `turn-card-${item.turn}`;
+    if (state.selectedTurn === item.turn) {
+      card.classList.add("is-highlight");
+    }
 
     const head = document.createElement("p");
     head.className = "turn-head";
@@ -385,6 +394,16 @@ function renderHistory() {
     card.appendChild(head);
     card.appendChild(userLine);
     card.appendChild(assistantLine);
+    const nextBest = item.feedback?.next_best_sentence || "";
+    if (nextBest) {
+      const keyLine = document.createElement("p");
+      keyLine.className = "turn-keyline";
+      keyLine.innerHTML = "<strong>关键句建议:</strong> ";
+      const textNode = document.createElement("span");
+      textNode.textContent = nextBest;
+      keyLine.appendChild(textNode);
+      card.appendChild(keyLine);
+    }
     container.appendChild(card);
   });
 }
@@ -414,6 +433,99 @@ function formatDateTime(value) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
+function setHighlightedText(element, content, keyword) {
+  const source = String(content || "");
+  const query = String(keyword || "").trim();
+  element.innerHTML = "";
+  if (!source) return;
+  if (!query) {
+    element.textContent = source;
+    return;
+  }
+
+  const lowerSource = source.toLocaleLowerCase();
+  const lowerQuery = query.toLocaleLowerCase();
+  let cursor = 0;
+  while (cursor < source.length) {
+    const hit = lowerSource.indexOf(lowerQuery, cursor);
+    if (hit < 0) {
+      element.appendChild(document.createTextNode(source.slice(cursor)));
+      break;
+    }
+
+    if (hit > cursor) {
+      element.appendChild(document.createTextNode(source.slice(cursor, hit)));
+    }
+
+    const mark = document.createElement("mark");
+    mark.textContent = source.slice(hit, hit + query.length);
+    element.appendChild(mark);
+    cursor = hit + query.length;
+  }
+}
+
+function getHistoryFilters() {
+  return {
+    state: byId("historyState").value.trim(),
+    keyword: byId("historyKeyword").value.trim(),
+    created_from: byId("historyCreatedFrom").value || "",
+    created_to: byId("historyCreatedTo").value || "",
+  };
+}
+
+function updateHistoryFilterHint(filters) {
+  const chips = [];
+  if (filters.state) chips.push(`状态:${filters.state}`);
+  if (filters.keyword) chips.push(`关键词:${filters.keyword}`);
+  if (filters.created_from) chips.push(`开始:${filters.created_from}`);
+  if (filters.created_to) chips.push(`结束:${filters.created_to}`);
+  byId("historyFilterHint").textContent = `当前筛选: ${chips.length ? chips.join(" / ") : "全部"}`;
+}
+
+function renderTurnJumpOptions() {
+  const select = byId("turnJumpSelect");
+  select.innerHTML = "";
+
+  const fallback = document.createElement("option");
+  fallback.value = "";
+  fallback.textContent = "最新一轮";
+  select.appendChild(fallback);
+
+  if (!state.history.length) {
+    select.disabled = true;
+    return;
+  }
+
+  state.history.forEach((item) => {
+    const option = document.createElement("option");
+    option.value = String(item.turn);
+    option.textContent = `第 ${item.turn} 轮`;
+    select.appendChild(option);
+  });
+
+  const latestTurn = state.history[state.history.length - 1].turn;
+  const hasSelected = state.history.some((item) => item.turn === state.selectedTurn);
+  const targetTurn = hasSelected ? state.selectedTurn : latestTurn;
+  state.selectedTurn = targetTurn;
+  select.value = String(targetTurn);
+  select.disabled = false;
+}
+
+function jumpToTurn(rawTurn, options = {}) {
+  if (!state.history.length) return;
+  const { smooth = true } = options;
+  const normalized = String(rawTurn ?? "").trim();
+  const parsed = Number(normalized);
+  const fallbackTurn = state.history[state.history.length - 1].turn;
+  state.selectedTurn = normalized && Number.isInteger(parsed) ? parsed : fallbackTurn;
+  renderHistory();
+  persistRuntimeState();
+  const target = byId(`turn-card-${state.selectedTurn}`);
+  if (target) {
+    target.scrollIntoView({ block: "nearest", behavior: smooth ? "smooth" : "auto" });
+  }
+}
+
 function applyReflectionToForm(reflection) {
   if (!reflection) {
     byId("usedInRealWorld").value = "true";
@@ -432,7 +544,7 @@ function applyReflectionToForm(reflection) {
   syncOutcomeState();
 }
 
-function renderSessionHistoryList(items) {
+function renderSessionHistoryList(items, keyword = "") {
   const container = byId("historySessionList");
   container.innerHTML = "";
 
@@ -454,11 +566,11 @@ function renderSessionHistoryList(items) {
 
     const title = document.createElement("p");
     title.className = "history-session-title";
-    title.textContent = item.scene_title || "未命名场景";
+    setHighlightedText(title, item.scene_title || "未命名场景", keyword);
 
     const snippet = document.createElement("p");
     snippet.className = "history-session-snippet";
-    snippet.textContent = item.last_user_message || "本会话尚无用户消息";
+    setHighlightedText(snippet, item.last_user_message || "本会话尚无用户消息", keyword);
 
     const actions = document.createElement("div");
     actions.className = "history-session-actions";
@@ -468,6 +580,16 @@ function renderSessionHistoryList(items) {
     loadBtn.className = "tone-ghost";
     loadBtn.textContent = "回看会话";
     loadBtn.addEventListener("click", () => loadSessionHistory(item.session_id).catch(showError));
+
+    if (item.state === "ACTIVE") {
+      const continueBtn = document.createElement("button");
+      continueBtn.type = "button";
+      continueBtn.textContent = "继续练习";
+      continueBtn.addEventListener("click", () =>
+        continueSessionFromHistory(item.session_id).catch(showError)
+      );
+      actions.appendChild(continueBtn);
+    }
 
     actions.appendChild(loadBtn);
     card.appendChild(head);
@@ -656,6 +778,7 @@ async function sendPracticeTurn({ createFresh = false } = {}) {
 
   const messageData = await sendSessionMessage(config, state.sessionId, content);
   state.turn = messageData.turn;
+  state.selectedTurn = messageData.turn;
   state.lastUserMessageId = messageData.user_message_id;
   state.history.push({
     turn: messageData.turn,
@@ -759,20 +882,43 @@ async function fetchWeeklyProgress() {
   setOutput(data);
 }
 
+function resetHistoryFilters() {
+  byId("historyState").value = "";
+  byId("historyKeyword").value = "";
+  byId("historyCreatedFrom").value = "";
+  byId("historyCreatedTo").value = "";
+  updateHistoryFilterHint(getHistoryFilters());
+}
+
 async function fetchSessionHistoryList(options = {}) {
   const { silent = false, setOutputPanel = false } = options;
   const config = getConfig({ requireAuthToken: true });
   const limit = Number(byId("historyLimit").value || 10);
   const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
+  const filters = getHistoryFilters();
+
+  if (filters.created_from && filters.created_to && filters.created_from > filters.created_to) {
+    throw new Error("开始日期不能晚于结束日期");
+  }
+
+  const query = new URLSearchParams({
+    limit: String(boundedLimit),
+    offset: "0",
+  });
+  if (filters.state) query.set("state", filters.state);
+  if (filters.keyword) query.set("keyword", filters.keyword);
+  if (filters.created_from) query.set("created_from", filters.created_from);
+  if (filters.created_to) query.set("created_to", filters.created_to);
 
   const data = await callApi(
-    `${config.apiBaseUrl}/api/v1/sessions?limit=${boundedLimit}&offset=0`,
+    `${config.apiBaseUrl}/api/v1/sessions?${query.toString()}`,
     {
       method: "GET",
       headers: authHeaders(config),
     }
   );
-  renderSessionHistoryList(data.items || []);
+  updateHistoryFilterHint(filters);
+  renderSessionHistoryList(data.items || [], filters.keyword);
   if (!silent) {
     setNotice(`历史会话已刷新，共 ${data.total ?? 0} 条。`, "success");
   }
@@ -793,6 +939,7 @@ async function loadSessionHistory(sessionId) {
   state.sceneId = data.scene.scene_id;
   state.sessionId = data.session_id;
   state.turn = data.current_turn || 0;
+  state.selectedTurn = data.current_turn || 0;
   state.summary = data.summary || null;
   state.reflectionId = data.reflection?.reflection_id || "";
   state.history = (data.turns || []).map((turn) => ({
@@ -828,6 +975,13 @@ async function loadSessionHistory(sessionId) {
   setOutput(data);
 }
 
+async function continueSessionFromHistory(sessionId) {
+  await loadSessionHistory(sessionId);
+  byId("messageContent").focus();
+  byId("messageContent").scrollIntoView({ behavior: "smooth", block: "center" });
+  setNotice("已切换到该会话，可直接输入下一句继续练习。", "success");
+}
+
 function showError(err) {
   const msg = String(err?.message || err);
   const mode = byId("authMode").value || "supabase";
@@ -852,6 +1006,7 @@ function bind() {
   applyModeVisibility();
   loadConfig();
   hydrateRuntimeState();
+  updateHistoryFilterHint(getHistoryFilters());
   updateRuntimeMeta();
   renderHistory();
   renderSummary();
@@ -878,6 +1033,28 @@ function bind() {
   byId("refreshHistoryBtn").addEventListener("click", () =>
     fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError)
   );
+  byId("resetHistoryFiltersBtn").addEventListener("click", () => {
+    resetHistoryFilters();
+    fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError);
+  });
+  byId("turnJumpSelect").addEventListener("change", (event) => {
+    jumpToTurn(event.target.value);
+  });
+  byId("continuePracticeBtn").addEventListener("click", () => {
+    if (!state.sessionId) {
+      setNotice("请先创建会话或从历史记录加载会话。", "warning");
+      return;
+    }
+    byId("messageContent").focus();
+    byId("messageContent").scrollIntoView({ behavior: "smooth", block: "center" });
+    setNotice("已定位到输入框，可继续当前会话。", "success");
+  });
+  byId("historyKeyword").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError);
+    }
+  });
 
   byId("startPracticeBtn").addEventListener("click", () =>
     sendPracticeTurn({ createFresh: true }).catch(showError)

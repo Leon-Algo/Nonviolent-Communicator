@@ -225,6 +225,25 @@ select:focus {
   padding: 6px 8px;
 }
 
+.inline-input select {
+  width: auto;
+  min-width: 98px;
+  padding: 6px 8px;
+}
+
+.history-keyword input {
+  width: 200px;
+}
+
+.history-filter-row {
+  margin-top: 0;
+}
+
+.history-filter-row .inline-input input {
+  width: auto;
+  min-width: 140px;
+}
+
 button {
   border: 2px solid var(--line);
   background: var(--accent);
@@ -379,6 +398,7 @@ button.tone-ghost {
   background: #f9fbfd;
   padding: 8px;
   margin-bottom: 8px;
+  scroll-margin-top: 12px;
 }
 
 .turn-card p {
@@ -391,6 +411,27 @@ button.tone-ghost {
   margin: 0 0 6px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.turn-card.is-highlight {
+  border: 2px solid var(--accent);
+  background: #ecfaf5;
+}
+
+.turn-keyline {
+  margin-top: 6px;
+  border-left: 3px solid var(--accent);
+  padding-left: 8px;
+  color: #194f40;
+}
+
+.turn-keyline strong {
+  color: #153d33;
+}
+
+mark {
+  background: #ffe4b2;
+  color: inherit;
 }
 
 .empty {

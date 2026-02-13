@@ -191,6 +191,86 @@ def test_full_api_flow_with_idempotency_and_progress():
     assert first_turn["assistant_content"]
     assert first_turn["feedback"]["overall_score"] >= 0
 
+    second_scene_resp = client.post(
+        "/api/v1/scenes",
+        headers=headers,
+        json={
+            "title": "跨团队冲突同步",
+            "template_id": "CROSS_TEAM_CONFLICT",
+            "counterparty_role": "OTHER",
+            "relationship_level": "TENSE",
+            "goal": "对齐接口交付边界",
+            "pain_points": ["双方都在甩锅"],
+            "context": "跨团队接口时间反复变化。",
+            "power_dynamic": "PEER_LEVEL",
+        },
+    )
+    assert second_scene_resp.status_code == 201
+    second_scene_id = second_scene_resp.json()["scene_id"]
+
+    second_session_resp = client.post(
+        "/api/v1/sessions",
+        headers=headers,
+        json={"scene_id": second_scene_id, "target_turns": 6},
+    )
+    assert second_session_resp.status_code == 201
+    second_session_id = second_session_resp.json()["session_id"]
+
+    second_msg_resp = client.post(
+        f"/api/v1/sessions/{second_session_id}/messages",
+        headers=headers,
+        json={
+            "client_message_id": str(uuid4()),
+            "content": "我们先把责任边界和接口时间点对齐。",
+        },
+    )
+    assert second_msg_resp.status_code == 200
+
+    _run_sql(
+        f"""
+        UPDATE sessions
+        SET state = 'ABANDONED',
+            created_at = NOW() - INTERVAL '3 day'
+        WHERE id = '{second_session_id}'
+        """
+    )
+
+    abandoned_list_resp = client.get(
+        "/api/v1/sessions?limit=10&offset=0&state=ABANDONED",
+        headers=headers,
+    )
+    assert abandoned_list_resp.status_code == 200
+    abandoned_list = abandoned_list_resp.json()
+    assert abandoned_list["total"] == 1
+    assert abandoned_list["items"][0]["session_id"] == second_session_id
+    assert abandoned_list["items"][0]["state"] == "ABANDONED"
+
+    keyword_list_resp = client.get(
+        "/api/v1/sessions?limit=10&offset=0&keyword=%E8%B7%A8%E5%9B%A2%E9%98%9F",
+        headers=headers,
+    )
+    assert keyword_list_resp.status_code == 200
+    keyword_list = keyword_list_resp.json()
+    assert keyword_list["total"] == 1
+    assert keyword_list["items"][0]["session_id"] == second_session_id
+
+    today = date.today().isoformat()
+    date_window_resp = client.get(
+        f"/api/v1/sessions?limit=10&offset=0&created_from={today}&created_to={today}",
+        headers=headers,
+    )
+    assert date_window_resp.status_code == 200
+    date_window = date_window_resp.json()
+    assert date_window["total"] >= 1
+    assert all(item["session_id"] != second_session_id for item in date_window["items"])
+
+    invalid_window_resp = client.get(
+        f"/api/v1/sessions?limit=10&offset=0&created_from={today}&created_to=2020-01-01",
+        headers=headers,
+    )
+    assert invalid_window_resp.status_code == 400
+    assert invalid_window_resp.json()["error_code"] == "VALIDATION_ERROR"
+
 
 def test_user_cannot_create_session_with_other_users_scene():
     client = TestClient(create_app())

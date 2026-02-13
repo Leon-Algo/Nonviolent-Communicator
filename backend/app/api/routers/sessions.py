@@ -1,4 +1,5 @@
 import json
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -124,27 +125,96 @@ async def create_session(
 async def list_sessions(
     limit: int = Query(default=10, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
+    session_state: SessionState | None = Query(default=None, alias="state"),
+    keyword: str | None = Query(default=None, min_length=1, max_length=80),
+    created_from: date | None = Query(default=None),
+    created_to: date | None = Query(default=None),
     user: AuthUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> SessionHistoryListResponse:
     await apply_request_rls_context(db, user)
     await ensure_user_exists(db, user)
 
+    if created_from and created_to and created_from > created_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="created_from must be less than or equal to created_to",
+        )
+
+    normalized_keyword = keyword.strip() if keyword else ""
+    where_conditions = ["s.user_id = :user_id"]
+    base_params: dict[str, str | int | date] = {"user_id": str(user.user_id)}
+
+    if session_state:
+        where_conditions.append("s.state = :session_state")
+        base_params["session_state"] = session_state.value
+
+    if created_from:
+        where_conditions.append("s.created_at >= :created_from")
+        base_params["created_from"] = created_from
+
+    if created_to:
+        where_conditions.append("s.created_at < :created_to_exclusive")
+        base_params["created_to_exclusive"] = created_to + timedelta(days=1)
+
+    if normalized_keyword:
+        where_conditions.append(
+            """
+            (
+              sc.title ILIKE :keyword
+              OR sc.goal ILIKE :keyword
+              OR sc.context ILIKE :keyword
+              OR COALESCE(um.content, '') ILIKE :keyword
+              OR COALESCE(am.content, '') ILIKE :keyword
+            )
+            """
+        )
+        base_params["keyword"] = f"%{normalized_keyword}%"
+
+    from_clause = """
+        FROM sessions s
+        JOIN scenes sc ON sc.id = s.scene_id
+        LEFT JOIN LATERAL (
+          SELECT m.id, m.turn_no, m.content
+          FROM messages m
+          WHERE m.session_id = s.id
+            AND m.role = 'USER'
+          ORDER BY m.turn_no DESC, m.created_at DESC
+          LIMIT 1
+        ) um ON TRUE
+        LEFT JOIN LATERAL (
+          SELECT m.content
+          FROM messages m
+          WHERE m.session_id = s.id
+            AND m.role = 'ASSISTANT'
+            AND m.turn_no = um.turn_no
+          ORDER BY m.created_at DESC
+          LIMIT 1
+        ) am ON TRUE
+        LEFT JOIN feedback_items f ON f.user_message_id = um.id
+        LEFT JOIN summaries sm ON sm.session_id = s.id
+        LEFT JOIN reflections r ON r.session_id = s.id
+    """
+    where_clause = " AND ".join(where_conditions)
+
     total_result = await db.execute(
         text(
-            """
+            f"""
             SELECT COUNT(*) AS total
-            FROM sessions
-            WHERE user_id = :user_id
+            {from_clause}
+            WHERE {where_clause}
             """
         ),
-        {"user_id": str(user.user_id)},
+        base_params,
     )
     total = int(total_result.mappings().one()["total"] or 0)
 
+    list_params = dict(base_params)
+    list_params["limit"] = limit
+    list_params["offset"] = offset
     list_result = await db.execute(
         text(
-            """
+            f"""
             SELECT
               s.id AS session_id,
               s.scene_id,
@@ -160,34 +230,13 @@ async def list_sessions(
               f.risk_level AS last_risk_level,
               (sm.id IS NOT NULL) AS has_summary,
               (r.id IS NOT NULL) AS has_reflection
-            FROM sessions s
-            JOIN scenes sc ON sc.id = s.scene_id
-            LEFT JOIN LATERAL (
-              SELECT m.id, m.turn_no, m.content
-              FROM messages m
-              WHERE m.session_id = s.id
-                AND m.role = 'USER'
-              ORDER BY m.turn_no DESC, m.created_at DESC
-              LIMIT 1
-            ) um ON TRUE
-            LEFT JOIN LATERAL (
-              SELECT m.content
-              FROM messages m
-              WHERE m.session_id = s.id
-                AND m.role = 'ASSISTANT'
-                AND m.turn_no = um.turn_no
-              ORDER BY m.created_at DESC
-              LIMIT 1
-            ) am ON TRUE
-            LEFT JOIN feedback_items f ON f.user_message_id = um.id
-            LEFT JOIN summaries sm ON sm.session_id = s.id
-            LEFT JOIN reflections r ON r.session_id = s.id
-            WHERE s.user_id = :user_id
+            {from_clause}
+            WHERE {where_clause}
             ORDER BY s.created_at DESC
             LIMIT :limit OFFSET :offset
             """
         ),
-        {"user_id": str(user.user_id), "limit": limit, "offset": offset},
+        list_params,
     )
     rows = list_result.mappings().all()
     items = [

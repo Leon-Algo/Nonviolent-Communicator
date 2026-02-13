@@ -92,6 +92,7 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - `POST /api/v1/scenes`
 - `POST /api/v1/sessions`
 - `GET /api/v1/sessions`
+  - supports filters: `state`, `keyword`, `created_from`, `created_to`
 - `GET /api/v1/sessions/{session_id}/history`
 - `POST /api/v1/sessions/{session_id}/messages`
 - `POST /api/v1/sessions/{session_id}/rewrite`
@@ -125,6 +126,6 @@ Run in order:
 
 ## Next Implementation Steps
 
-1. Improve history list filtering (status/date/keyword)
+1. Improve replay experience (turn jump/highlight and quick continue)
 2. Add stronger OFNR rubric and eval runner
 3. Add minimal observability dashboard and error alerting

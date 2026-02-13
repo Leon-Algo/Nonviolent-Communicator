@@ -163,6 +163,15 @@
         </div>
 
         <h3>会话记录</h3>
+        <div class="actions">
+          <label class="inline-input">
+            跳到轮次
+            <select id="turnJumpSelect">
+              <option value="">最新一轮</option>
+            </select>
+          </label>
+          <button id="continuePracticeBtn" type="button" class="tone-ghost">继续当前会话</button>
+        </div>
         <div id="conversationList" class="conversation-list">
           <p class="empty">还没有会话记录。</p>
         </div>
@@ -176,9 +185,34 @@
               最近数量
               <input id="historyLimit" type="number" min="1" max="50" value="10" />
             </label>
-            <button id="refreshHistoryBtn" type="button" class="tone-ghost">刷新历史</button>
+            <label class="inline-input">
+              状态
+              <select id="historyState">
+                <option value="">全部</option>
+                <option value="ACTIVE">进行中</option>
+                <option value="COMPLETED">已完成</option>
+                <option value="ABANDONED">已中止</option>
+              </select>
+            </label>
+            <label class="inline-input history-keyword">
+              关键词
+              <input id="historyKeyword" type="text" placeholder="标题/目标/消息" />
+            </label>
           </div>
         </div>
+        <div class="actions history-filter-row">
+          <label class="inline-input">
+            开始日期
+            <input id="historyCreatedFrom" type="date" />
+          </label>
+          <label class="inline-input">
+            结束日期
+            <input id="historyCreatedTo" type="date" />
+          </label>
+          <button id="refreshHistoryBtn" type="button" class="tone-ghost">应用筛选</button>
+          <button id="resetHistoryFiltersBtn" type="button" class="tone-ghost">清空筛选</button>
+        </div>
+        <p id="historyFilterHint" class="meta">当前筛选: 全部</p>
         <div id="historySessionList" class="history-session-list">
           <p class="empty">暂无历史会话，完成一次练习后这里会出现记录。</p>
         </div>
