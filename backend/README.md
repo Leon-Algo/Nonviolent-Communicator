@@ -110,8 +110,8 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - Unified error response contract (`error_code`, `message`, `request_id`)
 - Message API idempotency support (`client_message_id`)
 - DB pooling strategy:
-  - production: `NullPool` (serverless-safe)
-  - non-production: default pooled connections (better local stability)
+  - production/test: `NullPool` (serverless-safe, CI event-loop safe)
+  - development: default pooled connections (better local stability)
 
 ## Required DB Migrations
 

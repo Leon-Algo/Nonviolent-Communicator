@@ -3,7 +3,7 @@
 ## 0. 文档信息
 
 - 版本: v1.0（整合版）
-- 更新日期: 2026-02-12
+- 更新日期: 2026-02-13
 - 范围: MVP 当前技术实现与约束
 
 ## 1. 方案结论
@@ -37,8 +37,8 @@ flowchart LR
 
 ### 3.2 数据访问
 
-- 生产环境使用 `NullPool`（避免 serverless 连接池陈旧连接问题）
-- 非生产环境使用默认连接池（提高本地稳定性）
+- 生产与测试环境使用 `NullPool`（避免 serverless 连接池陈旧连接问题与测试事件循环污染）
+- 开发环境使用默认连接池（提高本地稳定性）
 - 统一开启 `pool_pre_ping`
 
 ## 4. 鉴权与安全
@@ -85,6 +85,9 @@ flowchart LR
 
 - 后端项目指向 `backend/`
 - 前端项目指向 `web/`
+- 生产域名:
+  - 前端 `https://nvc-practice-web.vercel.app`
+  - 后端 `https://nvc-practice-api.vercel.app`
 
 ### 7.2 关键环境变量
 
@@ -105,6 +108,10 @@ flowchart LR
 3. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
 4. 一键预检: `bash scripts/release_preflight.sh <api_url>`
 5. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
+
+补充:
+
+- 当前线上预检已包含历史回看接口校验（`GET /api/v1/sessions`、`GET /api/v1/sessions/{session_id}/history`）
 
 ## 9. 当前技术边界
 

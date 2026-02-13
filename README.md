@@ -10,6 +10,7 @@ NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
 - 鉴权: Supabase JWT（线上）+ Mock（本地开发）
 - AI: ModelScope OpenAI-compatible 接口
 - 核心链路: 场景 -> 会话 -> 消息反馈 -> 改写/总结 -> 复盘 -> 周进度
+- 历史回看: 跨会话历史列表 + 单会话完整回看
 
 ## 仓库结构
 
@@ -63,3 +64,8 @@ bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ## 部署说明
 
 前后端均可部署在 Vercel；GitHub Actions 用于自动化测试/预检，不替代 Vercel 的托管能力。
+
+生产地址:
+
+- 前端: `https://nvc-practice-web.vercel.app`
+- 后端: `https://nvc-practice-api.vercel.app`

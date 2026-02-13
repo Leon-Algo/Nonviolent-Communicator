@@ -2,8 +2,8 @@
 
 ## 1. 复盘范围
 
-- 时间范围: 2026-02-11 至 2026-02-12
-- 覆盖阶段: 从 MVP 首版联调到安全与回归基线落地
+- 时间范围: 2026-02-11 至 2026-02-13
+- 覆盖阶段: 从 MVP 首版联调到安全基线、回归闭环与 M3 可用性落地
 
 ## 2. 时间线摘要
 
@@ -13,10 +13,7 @@
 
 1. 核心 API 链路可运行（场景/会话/消息/改写/总结/复盘/进度）
 2. 前后端完成 Vercel 部署并可在线联调
-3. 修复核心稳定性问题:
-   - Pooler prepared statement 冲突
-   - SQL 参数歧义
-   - 模型响应结构容错
+3. 修复核心稳定性问题（Pooler prepared statement、SQL 参数歧义、模型响应容错）
 
 ### 2026-02-12
 
@@ -24,60 +21,63 @@
 
 1. 鉴权主链路收敛为 Supabase JWT（线上）
 2. `auth.users -> public.users` 自动同步迁移落地（`0003`）
-3. 核心表 RLS 与 claim 兼容修复落地（`0004`, `0005`）
-4. 增加自动化验证资产:
-   - DB 集成测试
-   - RLS 隔离校验脚本
-   - Supabase JWT 冒烟脚本
-   - 发布前一键预检脚本
-   - GitHub 手动预检 workflow
+3. RLS 与 claim 兼容修复落地（`0004`, `0005`）
+4. 补齐自动化资产（集成测试、RLS 脚本、JWT 冒烟、预检 workflow）
 
 ### 2026-02-13
 
 关键进展:
 
-1. 前端从“联调台”重构为“引导式 3 步练习流”
-2. 登录、会话、反馈、行动卡、复盘、周进度统一在单页流程内串联
-3. 线上默认隐藏高级配置，仅在 dev 场景开放 mock 与调试项
-4. 增加会话记录和步骤状态可视化，降低测试认知成本
-5. 新增跨会话历史回看能力（会话列表 + 会话详情历史接口）
+1. 前端重构为引导式 3 步练习流（登录 -> 对练 -> 总结复盘）
+2. 新增跨会话历史回看能力（`GET /sessions` + `GET /sessions/{id}/history`）
+3. 生产环境部署完成（前端/后端）
+4. 线上完整预检通过（含 RLS 与 JWT API smoke）
 
 ## 3. 关键问题与根因
 
 1. 前端 `Failed to fetch`
-   - 原因: 跨域/配置与历史状态混合导致请求路径不稳定。
+   - 根因: 跨域配置与历史本地配置混用，导致请求目标不稳定。
 2. 消息接口 500
-   - 原因: DB 连接与 SQL 参数处理在特定路径下不稳定。
+   - 根因: DB 连接策略与 SQL 参数处理在特定链路下不稳定。
 3. Supabase 注册 429
-   - 原因: Auth 邮件发送频控触发。
-4. mock token 与 supabase mode 混用报 401
-   - 原因: 鉴权模式与 token 类型不匹配。
+   - 根因: Auth 邮件发送频控触发。
+4. 云端预检早期失败（Event loop is closed）
+   - 根因: `APP_ENV=test` 下 asyncpg 连接在 CI 中出现事件循环污染。
+   - 处理: `test` 环境改用 `NullPool`，预检恢复通过。
 
 ## 4. 本阶段关键决策
 
 1. 线上仅开放 Supabase 鉴权入口，隐藏 mock 入口。
-2. mock 仅用于本地开发联调，并加生产环境保护开关。
-3. 发布前必须执行自动化预检，至少覆盖单测与 RLS 校验。
+2. mock 仅用于本地联调，并加生产安全开关限制。
+3. 发布前必须执行自动化预检，且至少覆盖:
+   - 后端测试
+   - RLS 隔离校验
+   - Supabase JWT API 冒烟
 
-## 5. 验证结果（已通过）
+## 5. 验证结果
 
-1. 后端测试: `pytest backend/tests -q`（17 passed, 2 skipped）
-2. 语法校验: `node --check web/app.js`、`bash -n` 脚本校验
-3. RLS 隔离: `bash scripts/rls_isolation_check.sh` 通过
-4. 一键预检: `SKIP_REMOTE_API_SMOKE=1 bash scripts/release_preflight.sh` 通过
-5. M3 页面交互链路已完成本地回归（登录、练习、总结复盘入口可达）
-6. 历史回看链路本地冒烟通过（列表查询 + 单会话回看）
+本地验证:
 
-说明:
+1. `pytest backend/tests -q` 通过（17 passed, 2 skipped）
+2. `node --check web/app.js` 通过
+3. `SKIP_REMOTE_API_SMOKE=1 bash scripts/release_preflight.sh` 通过
+4. 历史回看本地冒烟通过（列表 + 单会话详情）
 
-- 远端 API 冒烟在部分执行环境可能受网络限制，建议在 GitHub Actions 或本机可达网络补跑。
+云端验证:
+
+1. GitHub Actions 完整预检通过:
+   - `https://github.com/Leon-Algo/Nonviolent-Communicator/actions/runs/21979380349`
+2. 该次预检已包含并通过:
+   - RLS isolation check
+   - Supabase JWT API smoke（含历史回看接口路径）
 
 ## 6. 当前状态结论
 
-项目已从“可设计”进入“可运行、可回归、具备安全基线”的阶段，可继续推进产品可用性与观测能力建设。
+项目已进入“可上线演示、可回归验证、具备基础安全隔离”的阶段，且 M3 核心可用性已落地。
 
 ## 7. 下一阶段重点
 
-1. 前端练习流程产品化（降低测试复杂度）
-2. 会话历史与进度可视化
-3. 最小可观测性（日志、关键告警）
+1. 会话历史筛选与回看体验增强（状态/时间/关键词、按轮跳转）
+2. 行动卡与复盘可视化优化（复制、导出、可读性）
+3. 最小可观测性建设（结构化日志、5xx/慢请求告警）
+4. OFNR 评测集回归自动化（并入预检）

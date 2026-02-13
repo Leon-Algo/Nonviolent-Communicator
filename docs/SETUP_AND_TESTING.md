@@ -8,6 +8,11 @@
 2. 本地或线上 API 可用性验证
 3. 发布前预检
 
+当前生产地址:
+
+- 前端: `https://nvc-practice-web.vercel.app`
+- 后端: `https://nvc-practice-api.vercel.app`
+
 ## 2. 环境准备
 
 ### 2.1 必需资源
@@ -115,6 +120,12 @@ RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+
+当前仓库状态:
+
+- 已配置上述两个 Secrets，可直接运行完整线上预检。
+- 最近一次通过的完整预检（含 RLS + JWT API smoke）:
+  - `https://github.com/Leon-Algo/Nonviolent-Communicator/actions/runs/21979380349`
 
 ## 7. 常见问题
 
