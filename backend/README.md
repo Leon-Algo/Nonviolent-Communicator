@@ -91,6 +91,8 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 
 - `POST /api/v1/scenes`
 - `POST /api/v1/sessions`
+- `GET /api/v1/sessions`
+- `GET /api/v1/sessions/{session_id}/history`
 - `POST /api/v1/sessions/{session_id}/messages`
 - `POST /api/v1/sessions/{session_id}/rewrite`
 - `POST /api/v1/sessions/{session_id}/summary`
@@ -123,7 +125,6 @@ Run in order:
 
 ## Next Implementation Steps
 
-1. Add integration tests for core flows
-2. Add idempotency on `client_message_id`
-3. Add stronger OFNR rubric and eval runner
-4. Add Supabase RLS before public test
+1. Improve history list filtering (status/date/keyword)
+2. Add stronger OFNR rubric and eval runner
+3. Add minimal observability dashboard and error alerting

@@ -1,7 +1,7 @@
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,10 +15,18 @@ from app.schemas.sessions import (
     AssistantMessage,
     MessageCreateRequest,
     MessageCreateResponse,
+    OfnrFeedback,
     RewriteCreateRequest,
     RewriteCreateResponse,
     SessionCreateRequest,
     SessionCreateResponse,
+    SessionHistoryDetailResponse,
+    SessionHistoryFeedback,
+    SessionHistoryListItem,
+    SessionHistoryListResponse,
+    SessionHistoryReflection,
+    SessionHistoryScene,
+    SessionHistoryTurn,
     SessionState,
     SummaryCreateResponse,
 )
@@ -30,6 +38,15 @@ from app.services.nvc_service import (
 
 router = APIRouter(prefix="/api/v1/sessions", tags=["sessions"])
 MESSAGE_ENDPOINT_KEY = "POST:/api/v1/sessions/{session_id}/messages"
+
+
+def _parse_ofnr_detail(value: dict | str | None) -> OfnrFeedback | None:
+    if value is None:
+        return None
+    payload = value
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    return OfnrFeedback.model_validate(payload)
 
 
 async def _get_idempotent_message_response(
@@ -100,6 +117,249 @@ async def create_session(
         state=SessionState(row["state"]),
         current_turn=row["current_turn"],
         created_at=row["created_at"],
+    )
+
+
+@router.get("", response_model=SessionHistoryListResponse)
+async def list_sessions(
+    limit: int = Query(default=10, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionHistoryListResponse:
+    await apply_request_rls_context(db, user)
+    await ensure_user_exists(db, user)
+
+    total_result = await db.execute(
+        text(
+            """
+            SELECT COUNT(*) AS total
+            FROM sessions
+            WHERE user_id = :user_id
+            """
+        ),
+        {"user_id": str(user.user_id)},
+    )
+    total = int(total_result.mappings().one()["total"] or 0)
+
+    list_result = await db.execute(
+        text(
+            """
+            SELECT
+              s.id AS session_id,
+              s.scene_id,
+              sc.title AS scene_title,
+              s.state,
+              s.current_turn,
+              s.target_turns,
+              s.created_at,
+              s.ended_at,
+              um.content AS last_user_message,
+              am.content AS last_assistant_message,
+              f.overall_score AS last_overall_score,
+              f.risk_level AS last_risk_level,
+              (sm.id IS NOT NULL) AS has_summary,
+              (r.id IS NOT NULL) AS has_reflection
+            FROM sessions s
+            JOIN scenes sc ON sc.id = s.scene_id
+            LEFT JOIN LATERAL (
+              SELECT m.id, m.turn_no, m.content
+              FROM messages m
+              WHERE m.session_id = s.id
+                AND m.role = 'USER'
+              ORDER BY m.turn_no DESC, m.created_at DESC
+              LIMIT 1
+            ) um ON TRUE
+            LEFT JOIN LATERAL (
+              SELECT m.content
+              FROM messages m
+              WHERE m.session_id = s.id
+                AND m.role = 'ASSISTANT'
+                AND m.turn_no = um.turn_no
+              ORDER BY m.created_at DESC
+              LIMIT 1
+            ) am ON TRUE
+            LEFT JOIN feedback_items f ON f.user_message_id = um.id
+            LEFT JOIN summaries sm ON sm.session_id = s.id
+            LEFT JOIN reflections r ON r.session_id = s.id
+            WHERE s.user_id = :user_id
+            ORDER BY s.created_at DESC
+            LIMIT :limit OFFSET :offset
+            """
+        ),
+        {"user_id": str(user.user_id), "limit": limit, "offset": offset},
+    )
+    rows = list_result.mappings().all()
+    items = [
+        SessionHistoryListItem(
+            session_id=row["session_id"],
+            scene_id=row["scene_id"],
+            scene_title=row["scene_title"],
+            state=SessionState(row["state"]),
+            current_turn=row["current_turn"],
+            target_turns=row["target_turns"],
+            created_at=row["created_at"],
+            ended_at=row["ended_at"],
+            last_user_message=row["last_user_message"],
+            last_assistant_message=row["last_assistant_message"],
+            last_overall_score=row["last_overall_score"],
+            last_risk_level=row["last_risk_level"],
+            has_summary=bool(row["has_summary"]),
+            has_reflection=bool(row["has_reflection"]),
+        )
+        for row in rows
+    ]
+    return SessionHistoryListResponse(items=items, limit=limit, offset=offset, total=total)
+
+
+@router.get("/{session_id}/history", response_model=SessionHistoryDetailResponse)
+async def get_session_history(
+    session_id: UUID,
+    user: AuthUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> SessionHistoryDetailResponse:
+    await apply_request_rls_context(db, user)
+    await ensure_user_exists(db, user)
+
+    session_result = await db.execute(
+        text(
+            """
+            SELECT
+              s.id AS session_id,
+              s.scene_id,
+              s.state,
+              s.current_turn,
+              s.target_turns,
+              s.created_at,
+              s.ended_at,
+              sc.title AS scene_title,
+              sc.goal AS scene_goal,
+              sc.context AS scene_context,
+              sc.template_id AS scene_template_id,
+              sm.id AS summary_id,
+              sm.opening_line,
+              sm.request_line,
+              sm.fallback_line,
+              sm.risk_triggers,
+              sm.created_at AS summary_created_at,
+              r.id AS reflection_id,
+              r.used_in_real_world,
+              r.outcome_score,
+              r.blocker_code,
+              r.blocker_note,
+              r.created_at AS reflection_created_at
+            FROM sessions s
+            JOIN scenes sc ON sc.id = s.scene_id
+            LEFT JOIN summaries sm ON sm.session_id = s.id
+            LEFT JOIN reflections r ON r.session_id = s.id
+            WHERE s.id = :session_id
+              AND s.user_id = :user_id
+            LIMIT 1
+            """
+        ),
+        {"session_id": str(session_id), "user_id": str(user.user_id)},
+    )
+    session_row = session_result.mappings().first()
+    if not session_row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="session not found")
+
+    turns_result = await db.execute(
+        text(
+            """
+            SELECT
+              um.turn_no,
+              um.id AS user_message_id,
+              um.content AS user_content,
+              am.id AS assistant_message_id,
+              am.content AS assistant_content,
+              f.overall_score,
+              f.risk_level,
+              f.ofnr_detail,
+              f.next_best_sentence
+            FROM messages um
+            LEFT JOIN LATERAL (
+              SELECT m.id, m.content
+              FROM messages m
+              WHERE m.session_id = um.session_id
+                AND m.role = 'ASSISTANT'
+                AND m.turn_no = um.turn_no
+              ORDER BY m.created_at DESC
+              LIMIT 1
+            ) am ON TRUE
+            LEFT JOIN feedback_items f ON f.user_message_id = um.id
+            WHERE um.session_id = :session_id
+              AND um.role = 'USER'
+            ORDER BY um.turn_no ASC, um.created_at ASC
+            """
+        ),
+        {"session_id": str(session_id)},
+    )
+    turn_rows = turns_result.mappings().all()
+    turns = []
+    for row in turn_rows:
+        feedback = None
+        if row["overall_score"] is not None or row["next_best_sentence"] is not None:
+            try:
+                parsed_ofnr = _parse_ofnr_detail(row["ofnr_detail"])
+            except (ValueError, TypeError, json.JSONDecodeError):
+                parsed_ofnr = None
+            feedback = SessionHistoryFeedback(
+                overall_score=row["overall_score"],
+                risk_level=row["risk_level"],
+                ofnr=parsed_ofnr,
+                next_best_sentence=row["next_best_sentence"],
+            )
+
+        turns.append(
+            SessionHistoryTurn(
+                turn=row["turn_no"],
+                user_message_id=row["user_message_id"],
+                user_content=row["user_content"],
+                assistant_message_id=row["assistant_message_id"],
+                assistant_content=row["assistant_content"],
+                feedback=feedback,
+            )
+        )
+
+    summary = None
+    if session_row["summary_id"]:
+        summary = SummaryCreateResponse(
+            summary_id=session_row["summary_id"],
+            opening_line=session_row["opening_line"],
+            request_line=session_row["request_line"],
+            fallback_line=session_row["fallback_line"] or "",
+            risk_triggers=session_row["risk_triggers"] or [],
+            created_at=session_row["summary_created_at"],
+        )
+
+    reflection = None
+    if session_row["reflection_id"]:
+        reflection = SessionHistoryReflection(
+            reflection_id=session_row["reflection_id"],
+            used_in_real_world=bool(session_row["used_in_real_world"]),
+            outcome_score=session_row["outcome_score"],
+            blocker_code=session_row["blocker_code"],
+            blocker_note=session_row["blocker_note"],
+            created_at=session_row["reflection_created_at"],
+        )
+
+    return SessionHistoryDetailResponse(
+        session_id=session_row["session_id"],
+        scene=SessionHistoryScene(
+            scene_id=session_row["scene_id"],
+            title=session_row["scene_title"],
+            goal=session_row["scene_goal"],
+            context=session_row["scene_context"],
+            template_id=session_row["scene_template_id"],
+        ),
+        state=SessionState(session_row["state"]),
+        current_turn=session_row["current_turn"],
+        target_turns=session_row["target_turns"],
+        created_at=session_row["created_at"],
+        ended_at=session_row["ended_at"],
+        turns=turns,
+        summary=summary,
+        reflection=reflection,
     )
 
 

@@ -169,6 +169,22 @@
       </section>
 
       <section class="panel">
+        <div class="panel-title-row">
+          <h2>历史会话列表（跨会话回看）</h2>
+          <div class="actions">
+            <label class="inline-input">
+              最近数量
+              <input id="historyLimit" type="number" min="1" max="50" value="10" />
+            </label>
+            <button id="refreshHistoryBtn" type="button" class="tone-ghost">刷新历史</button>
+          </div>
+        </div>
+        <div id="historySessionList" class="history-session-list">
+          <p class="empty">暂无历史会话，完成一次练习后这里会出现记录。</p>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>Step 3. 总结与复盘</h2>
         <div class="actions">
           <button id="generateSummaryBtn" type="button">生成行动卡</button>

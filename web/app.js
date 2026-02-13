@@ -209,6 +209,7 @@ function resetRuntimeState() {
   persistRuntimeState();
   renderHistory();
   renderSummary();
+  clearFeedbackPanel();
   updateRuntimeMeta();
   updateStepState();
 }
@@ -337,6 +338,17 @@ function renderFeedback(messageResponse) {
   byId("ofnrRequest").textContent = formatOfnr(ofnr?.request);
 }
 
+function clearFeedbackPanel() {
+  byId("assistantReply").textContent = "发送一条消息后，这里会显示对方回复。";
+  byId("feedbackOverall").textContent = "-";
+  byId("feedbackRisk").textContent = "-";
+  byId("nextSentence").textContent = "-";
+  byId("ofnrObservation").textContent = "-";
+  byId("ofnrFeeling").textContent = "-";
+  byId("ofnrNeed").textContent = "-";
+  byId("ofnrRequest").textContent = "-";
+}
+
 function formatOfnr(dimension) {
   if (!dimension) return "-";
   const status = dimension.status || "UNKNOWN";
@@ -395,6 +407,77 @@ function renderProgress(progress) {
   byId("progressOutcome").textContent = Number(progress.avg_outcome_score ?? 0).toFixed(2);
 }
 
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function applyReflectionToForm(reflection) {
+  if (!reflection) {
+    byId("usedInRealWorld").value = "true";
+    byId("outcomeScore").value = "";
+    byId("blockerNote").value = "";
+    syncOutcomeState();
+    return;
+  }
+
+  byId("usedInRealWorld").value = reflection.used_in_real_world ? "true" : "false";
+  byId("outcomeScore").value =
+    reflection.outcome_score === null || reflection.outcome_score === undefined
+      ? ""
+      : String(reflection.outcome_score);
+  byId("blockerNote").value = reflection.blocker_note || "";
+  syncOutcomeState();
+}
+
+function renderSessionHistoryList(items) {
+  const container = byId("historySessionList");
+  container.innerHTML = "";
+
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "暂无历史会话，完成一次练习后这里会出现记录。";
+    container.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "history-session-card";
+
+    const head = document.createElement("p");
+    head.className = "history-session-head";
+    head.textContent = `${formatDateTime(item.created_at)} · ${item.state} · ${item.current_turn}/${item.target_turns} 轮`;
+
+    const title = document.createElement("p");
+    title.className = "history-session-title";
+    title.textContent = item.scene_title || "未命名场景";
+
+    const snippet = document.createElement("p");
+    snippet.className = "history-session-snippet";
+    snippet.textContent = item.last_user_message || "本会话尚无用户消息";
+
+    const actions = document.createElement("div");
+    actions.className = "history-session-actions";
+
+    const loadBtn = document.createElement("button");
+    loadBtn.type = "button";
+    loadBtn.className = "tone-ghost";
+    loadBtn.textContent = "回看会话";
+    loadBtn.addEventListener("click", () => loadSessionHistory(item.session_id).catch(showError));
+
+    actions.appendChild(loadBtn);
+    card.appendChild(head);
+    card.appendChild(title);
+    card.appendChild(snippet);
+    card.appendChild(actions);
+    container.appendChild(card);
+  });
+}
+
 function persistSupabaseSession(config, session, message) {
   byId("supabaseAccessToken").value = session.access_token;
   setAuthMode("supabase");
@@ -435,6 +518,7 @@ async function loginSupabase() {
 
   const session = await fetchSupabasePasswordToken(config);
   persistSupabaseSession(config, session, "登录成功，已获取 Access Token。");
+  await fetchSessionHistoryList({ silent: true });
 }
 
 async function signupSupabase() {
@@ -472,6 +556,7 @@ async function signupSupabase() {
 
   if (data.access_token) {
     persistSupabaseSession(config, data, "注册成功，已自动登录。");
+    await fetchSessionHistoryList({ silent: true });
     return;
   }
 
@@ -594,6 +679,7 @@ async function sendPracticeTurn({ createFresh = false } = {}) {
     "success"
   );
   setOutput(messageData);
+  fetchSessionHistoryList({ silent: true }).catch(() => {});
 }
 
 async function generateSummary() {
@@ -614,6 +700,7 @@ async function generateSummary() {
   updateStepState();
   setNotice("行动卡已生成。", "success");
   setOutput(data);
+  fetchSessionHistoryList({ silent: true }).catch(() => {});
 }
 
 async function submitReflection() {
@@ -651,6 +738,7 @@ async function submitReflection() {
   updateStepState();
   setNotice("复盘已提交。", "success");
   setOutput(data);
+  fetchSessionHistoryList({ silent: true }).catch(() => {});
 }
 
 async function fetchWeeklyProgress() {
@@ -668,6 +756,75 @@ async function fetchWeeklyProgress() {
 
   renderProgress(data);
   setNotice("周进度已更新。", "success");
+  setOutput(data);
+}
+
+async function fetchSessionHistoryList(options = {}) {
+  const { silent = false, setOutputPanel = false } = options;
+  const config = getConfig({ requireAuthToken: true });
+  const limit = Number(byId("historyLimit").value || 10);
+  const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
+
+  const data = await callApi(
+    `${config.apiBaseUrl}/api/v1/sessions?limit=${boundedLimit}&offset=0`,
+    {
+      method: "GET",
+      headers: authHeaders(config),
+    }
+  );
+  renderSessionHistoryList(data.items || []);
+  if (!silent) {
+    setNotice(`历史会话已刷新，共 ${data.total ?? 0} 条。`, "success");
+  }
+  if (setOutputPanel) {
+    setOutput(data);
+  }
+  return data;
+}
+
+async function loadSessionHistory(sessionId) {
+  clearNotice();
+  const config = getConfig({ requireAuthToken: true });
+  const data = await callApi(`${config.apiBaseUrl}/api/v1/sessions/${sessionId}/history`, {
+    method: "GET",
+    headers: authHeaders(config),
+  });
+
+  state.sceneId = data.scene.scene_id;
+  state.sessionId = data.session_id;
+  state.turn = data.current_turn || 0;
+  state.summary = data.summary || null;
+  state.reflectionId = data.reflection?.reflection_id || "";
+  state.history = (data.turns || []).map((turn) => ({
+    turn: turn.turn,
+    user: turn.user_content || "",
+    assistant: turn.assistant_content || "",
+    feedback: turn.feedback || null,
+  }));
+  state.lastUserMessageId =
+    data.turns && data.turns.length ? data.turns[data.turns.length - 1].user_message_id : "";
+
+  byId("sceneTitle").value = data.scene.title || byId("sceneTitle").value;
+  byId("sceneGoal").value = data.scene.goal || byId("sceneGoal").value;
+  byId("sceneContext").value = data.scene.context || byId("sceneContext").value;
+
+  renderHistory();
+  renderSummary();
+  updateRuntimeMeta();
+  updateStepState();
+  applyReflectionToForm(data.reflection);
+  if (state.history.length > 0) {
+    const last = state.history[state.history.length - 1];
+    renderFeedback({
+      assistant_message: { content: last.assistant },
+      feedback: last.feedback || null,
+    });
+  } else {
+    clearFeedbackPanel();
+  }
+
+  persistRuntimeState();
+  setNotice("会话已加载，可继续回看或继续练习。", "success");
   setOutput(data);
 }
 
@@ -700,6 +857,7 @@ function bind() {
   renderSummary();
   byId("progressWeekStart").value = getCurrentWeekStart();
   syncOutcomeState();
+  applyReflectionToForm(null);
   updateStepState();
 
   byId("templatePreset").addEventListener("change", applyTemplatePreset);
@@ -711,11 +869,15 @@ function bind() {
   byId("clearTokenBtn").addEventListener("click", () => {
     byId("supabaseAccessToken").value = "";
     localStorage.removeItem("supabase_access_token");
+    renderSessionHistoryList([]);
     updateStepState();
     setNotice("已清空 Access Token。", "success");
   });
 
   byId("saveConfigBtn").addEventListener("click", saveConfig);
+  byId("refreshHistoryBtn").addEventListener("click", () =>
+    fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError)
+  );
 
   byId("startPracticeBtn").addEventListener("click", () =>
     sendPracticeTurn({ createFresh: true }).catch(showError)
@@ -762,6 +924,14 @@ function bind() {
     byId("sceneTitle").value = demoPreset.title;
     byId("sceneGoal").value = demoPreset.goal;
     byId("sceneContext").value = demoPreset.context;
+  }
+
+  const mode = byId("authMode").value || "supabase";
+  const hasToken = Boolean(byId("supabaseAccessToken").value.trim());
+  if (mode === "mock" || hasToken) {
+    fetchSessionHistoryList({ silent: true }).catch(() => {});
+  } else {
+    renderSessionHistoryList([]);
   }
 }
 

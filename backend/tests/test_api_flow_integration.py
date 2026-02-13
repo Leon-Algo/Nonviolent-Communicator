@@ -165,6 +165,32 @@ def test_full_api_flow_with_idempotency_and_progress():
     assert progress["summary_count"] >= 1
     assert progress["real_world_used_count"] >= 1
 
+    history_list_resp = client.get("/api/v1/sessions?limit=10&offset=0", headers=headers)
+    assert history_list_resp.status_code == 200
+    history_list = history_list_resp.json()
+    assert history_list["total"] >= 1
+    assert len(history_list["items"]) >= 1
+    assert history_list["items"][0]["session_id"] == session_id
+    assert history_list["items"][0]["scene_id"] == scene_id
+    assert history_list["items"][0]["scene_title"] == "和同事沟通延期风险"
+    assert history_list["items"][0]["has_summary"] is True
+    assert history_list["items"][0]["has_reflection"] is True
+
+    history_detail_resp = client.get(f"/api/v1/sessions/{session_id}/history", headers=headers)
+    assert history_detail_resp.status_code == 200
+    history_detail = history_detail_resp.json()
+    assert history_detail["session_id"] == session_id
+    assert history_detail["scene"]["scene_id"] == scene_id
+    assert history_detail["scene"]["title"] == "和同事沟通延期风险"
+    assert history_detail["summary"]["summary_id"] == summary_body["summary_id"]
+    assert history_detail["reflection"]["used_in_real_world"] is True
+    assert len(history_detail["turns"]) >= 1
+    first_turn = history_detail["turns"][0]
+    assert first_turn["turn"] == 1
+    assert first_turn["user_content"] == "你们总是拖延，根本不专业。"
+    assert first_turn["assistant_content"]
+    assert first_turn["feedback"]["overall_score"] >= 0
+
 
 def test_user_cannot_create_session_with_other_users_scene():
     client = TestClient(create_app())
@@ -195,3 +221,32 @@ def test_user_cannot_create_session_with_other_users_scene():
     )
     assert forbidden_resp.status_code == 404
     assert forbidden_resp.json()["error_code"] == "NOT_FOUND"
+
+    session_resp = client.post(
+        "/api/v1/sessions",
+        headers=user_a_headers,
+        json={"scene_id": scene_id, "target_turns": 6},
+    )
+    assert session_resp.status_code == 201
+    session_id = session_resp.json()["session_id"]
+
+    user_a_message_resp = client.post(
+        f"/api/v1/sessions/{session_id}/messages",
+        headers=user_a_headers,
+        json={
+            "client_message_id": str(uuid4()),
+            "content": "这是 A 的第一条消息。",
+        },
+    )
+    assert user_a_message_resp.status_code == 200
+
+    user_b_history_detail = client.get(
+        f"/api/v1/sessions/{session_id}/history",
+        headers=user_b_headers,
+    )
+    assert user_b_history_detail.status_code == 404
+    assert user_b_history_detail.json()["error_code"] == "NOT_FOUND"
+
+    user_b_history_list = client.get("/api/v1/sessions?limit=10&offset=0", headers=user_b_headers)
+    assert user_b_history_list.status_code == 200
+    assert user_b_history_list.json()["total"] == 0

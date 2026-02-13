@@ -93,3 +93,73 @@ class SummaryCreateResponse(BaseModel):
     fallback_line: str
     risk_triggers: list[str]
     created_at: datetime
+
+
+class SessionHistoryListItem(BaseModel):
+    session_id: UUID
+    scene_id: UUID
+    scene_title: str
+    state: SessionState
+    current_turn: int = Field(ge=0)
+    target_turns: int = Field(ge=5, le=8)
+    created_at: datetime
+    ended_at: datetime | None = None
+    last_user_message: str | None = None
+    last_assistant_message: str | None = None
+    last_overall_score: int | None = Field(default=None, ge=0, le=100)
+    last_risk_level: RiskLevel | None = None
+    has_summary: bool
+    has_reflection: bool
+
+
+class SessionHistoryListResponse(BaseModel):
+    items: list[SessionHistoryListItem]
+    limit: int = Field(ge=1, le=50)
+    offset: int = Field(ge=0)
+    total: int = Field(ge=0)
+
+
+class SessionHistoryFeedback(BaseModel):
+    overall_score: int | None = Field(default=None, ge=0, le=100)
+    risk_level: RiskLevel | None = None
+    ofnr: OfnrFeedback | None = None
+    next_best_sentence: str | None = None
+
+
+class SessionHistoryTurn(BaseModel):
+    turn: int = Field(ge=1)
+    user_message_id: UUID
+    user_content: str
+    assistant_message_id: UUID | None = None
+    assistant_content: str | None = None
+    feedback: SessionHistoryFeedback | None = None
+
+
+class SessionHistoryScene(BaseModel):
+    scene_id: UUID
+    title: str
+    goal: str
+    context: str
+    template_id: str
+
+
+class SessionHistoryReflection(BaseModel):
+    reflection_id: UUID
+    used_in_real_world: bool
+    outcome_score: int | None = Field(default=None, ge=1, le=5)
+    blocker_code: str | None = None
+    blocker_note: str | None = None
+    created_at: datetime
+
+
+class SessionHistoryDetailResponse(BaseModel):
+    session_id: UUID
+    scene: SessionHistoryScene
+    state: SessionState
+    current_turn: int = Field(ge=0)
+    target_turns: int = Field(ge=5, le=8)
+    created_at: datetime
+    ended_at: datetime | None = None
+    turns: list[SessionHistoryTurn]
+    summary: SummaryCreateResponse | None = None
+    reflection: SessionHistoryReflection | None = None

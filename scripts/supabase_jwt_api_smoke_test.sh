@@ -95,7 +95,7 @@ password="JwtSmoke!123456"
 echo "Using API_BASE_URL=${API_BASE_URL}"
 echo "Using test email=${email}"
 
-echo "[1/6] signup and login with Supabase"
+echo "[1/7] signup and login with Supabase"
 signup_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password}')"
 response="$(curl -sS -w $'\n%{http_code}' -X POST "${SUPABASE_URL%/}/auth/v1/signup" \
   -H "Content-Type: application/json" \
@@ -122,7 +122,7 @@ if [[ -z "${access_token}" ]]; then
   exit 1
 fi
 
-echo "[2/6] create scene via backend (JWT)"
+echo "[2/7] create scene via backend (JWT)"
 scene_payload='{
   "title":"JWT smoke scene",
   "template_id":"PEER_FEEDBACK",
@@ -142,7 +142,7 @@ if [[ -z "${scene_id}" ]]; then
   exit 1
 fi
 
-echo "[3/6] create session via backend (JWT)"
+echo "[3/7] create session via backend (JWT)"
 session_payload="$(jq -n --arg sid "${scene_id}" '{scene_id:$sid,target_turns:6}')"
 request_json "POST" "${API_BASE_URL}/api/v1/sessions" "${access_token}" "${session_payload}"
 expect_status "201" "create session"
@@ -153,7 +153,7 @@ if [[ -z "${session_id}" ]]; then
   exit 1
 fi
 
-echo "[4/6] create message and check idempotency"
+echo "[4/7] create message and check idempotency"
 client_message_id="$(random_uuid)"
 message_payload="$(jq -n --arg cmid "${client_message_id}" '{client_message_id:$cmid,content:"你们总是拖延，根本不专业。"}')"
 request_json "POST" "${API_BASE_URL}/api/v1/sessions/${session_id}/messages" "${access_token}" "${message_payload}"
@@ -173,7 +173,7 @@ if [[ "${first_msg_id}" != "${retry_msg_id}" ]]; then
   exit 1
 fi
 
-echo "[5/6] create summary"
+echo "[5/7] create summary"
 request_json "POST" "${API_BASE_URL}/api/v1/sessions/${session_id}/summary" "${access_token}" ""
 expect_status "200" "create summary"
 summary_id="$(echo "${LAST_BODY}" | jq -r '.summary_id // empty')"
@@ -183,7 +183,24 @@ if [[ -z "${summary_id}" ]]; then
   exit 1
 fi
 
-echo "[6/6] check weekly progress endpoint"
+echo "[6/7] check session history list/detail"
+request_json "GET" "${API_BASE_URL}/api/v1/sessions?limit=10&offset=0" "${access_token}" ""
+expect_status "200" "session history list"
+history_total="$(echo "${LAST_BODY}" | jq -r '.total // 0')"
+if [[ "${history_total}" -lt 1 ]]; then
+  echo "[FAIL] expected history total >= 1, got ${history_total}" >&2
+  exit 1
+fi
+
+request_json "GET" "${API_BASE_URL}/api/v1/sessions/${session_id}/history" "${access_token}" ""
+expect_status "200" "session history detail"
+history_session_id="$(echo "${LAST_BODY}" | jq -r '.session_id // empty')"
+if [[ "${history_session_id}" != "${session_id}" ]]; then
+  echo "[FAIL] history session id mismatch: ${history_session_id} vs ${session_id}" >&2
+  exit 1
+fi
+
+echo "[7/7] check weekly progress endpoint"
 week_start="$(date +%F)"
 request_json "GET" "${API_BASE_URL}/api/v1/progress/weekly?week_start=${week_start}" "${access_token}" ""
 expect_status "200" "weekly progress"

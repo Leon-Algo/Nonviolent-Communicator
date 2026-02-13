@@ -41,6 +41,37 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
   /sessions:
+    get:
+      tags: [sessions]
+      operationId: listSessions
+      summary: Get current user's session history list
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - in: query
+          name: offset
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Session history list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionHistoryListResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       tags: [sessions]
       operationId: createSession
@@ -60,6 +91,26 @@ paths:
                 $ref: '#/components/schemas/SessionCreateResponse'
         '400':
           $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sessions/{session_id}/history:
+    get:
+      tags: [sessions]
+      operationId: getSessionHistory
+      summary: Get one session full history for replay
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Session history detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionHistoryDetailResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
@@ -398,6 +449,187 @@ components:
         created_at:
           type: string
           format: date-time
+    SessionHistoryListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+        - scene_id
+        - scene_title
+        - state
+        - current_turn
+        - target_turns
+        - created_at
+        - has_summary
+        - has_reflection
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        scene_id:
+          type: string
+          format: uuid
+        scene_title:
+          type: string
+        state:
+          $ref: '#/components/schemas/SessionState'
+        current_turn:
+          type: integer
+          minimum: 0
+        target_turns:
+          type: integer
+          minimum: 5
+          maximum: 8
+        created_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        last_user_message:
+          type: string
+        last_assistant_message:
+          type: string
+        last_overall_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        last_risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        has_summary:
+          type: boolean
+        has_reflection:
+          type: boolean
+    SessionHistoryListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, limit, offset, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionHistoryListItem'
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 50
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    SessionHistoryFeedback:
+      type: object
+      additionalProperties: false
+      properties:
+        overall_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+        risk_level:
+          $ref: '#/components/schemas/RiskLevel'
+        ofnr:
+          $ref: '#/components/schemas/OfnrFeedback'
+        next_best_sentence:
+          type: string
+    SessionHistoryTurn:
+      type: object
+      additionalProperties: false
+      required: [turn, user_message_id, user_content]
+      properties:
+        turn:
+          type: integer
+          minimum: 1
+        user_message_id:
+          type: string
+          format: uuid
+        user_content:
+          type: string
+        assistant_message_id:
+          type: string
+          format: uuid
+        assistant_content:
+          type: string
+        feedback:
+          $ref: '#/components/schemas/SessionHistoryFeedback'
+    SessionHistoryScene:
+      type: object
+      additionalProperties: false
+      required: [scene_id, title, goal, context, template_id]
+      properties:
+        scene_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        goal:
+          type: string
+        context:
+          type: string
+        template_id:
+          $ref: '#/components/schemas/TemplateId'
+    SessionHistoryReflection:
+      type: object
+      additionalProperties: false
+      required: [reflection_id, used_in_real_world, created_at]
+      properties:
+        reflection_id:
+          type: string
+          format: uuid
+        used_in_real_world:
+          type: boolean
+        outcome_score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        blocker_code:
+          $ref: '#/components/schemas/BlockerCode'
+        blocker_note:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    SessionHistoryDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+        - scene
+        - state
+        - current_turn
+        - target_turns
+        - created_at
+        - turns
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        scene:
+          $ref: '#/components/schemas/SessionHistoryScene'
+        state:
+          $ref: '#/components/schemas/SessionState'
+        current_turn:
+          type: integer
+          minimum: 0
+        target_turns:
+          type: integer
+          minimum: 5
+          maximum: 8
+        created_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        turns:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionHistoryTurn'
+        summary:
+          $ref: '#/components/schemas/SummaryCreateResponse'
+        reflection:
+          $ref: '#/components/schemas/SessionHistoryReflection'
     MessageCreateRequest:
       type: object
       additionalProperties: false
