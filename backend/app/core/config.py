@@ -10,6 +10,10 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 class Settings(BaseSettings):
     app_env: str = Field(default="development", alias="APP_ENV")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
+    slow_request_ms: int = Field(default=1200, alias="SLOW_REQUEST_MS")
+    observability_recent_error_limit: int = Field(
+        default=20, alias="OBSERVABILITY_RECENT_ERROR_LIMIT"
+    )
     auth_mode: str = Field(default="mock", alias="AUTH_MODE")
     mock_auth_enabled: bool = Field(default=True, alias="MOCK_AUTH_ENABLED")
     allow_mock_auth_in_production: bool = Field(
@@ -60,6 +64,8 @@ class Settings(BaseSettings):
     @field_validator(
         "app_env",
         "log_level",
+        "slow_request_ms",
+        "observability_recent_error_limit",
         "auth_mode",
         "database_url",
         "supabase_url",
@@ -90,6 +96,24 @@ class Settings(BaseSettings):
         if normalized not in {"mock", "supabase"}:
             return "mock"
         return normalized
+
+    @field_validator("slow_request_ms", mode="before")
+    @classmethod
+    def normalize_slow_request_ms(cls, value):
+        try:
+            normalized = int(value)
+        except (TypeError, ValueError):
+            return 1200
+        return max(1, normalized)
+
+    @field_validator("observability_recent_error_limit", mode="before")
+    @classmethod
+    def normalize_recent_error_limit(cls, value):
+        try:
+            normalized = int(value)
+        except (TypeError, ValueError):
+            return 20
+        return max(1, normalized)
 
     @field_validator("mock_auth_enabled", mode="before")
     @classmethod

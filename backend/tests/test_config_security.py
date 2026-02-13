@@ -33,3 +33,13 @@ def test_prod_allows_mock_auth_with_explicit_override():
     cfg = Settings(**payload)
     assert cfg.mock_auth_enabled is True
     assert cfg.allow_mock_auth_in_production is True
+
+
+def test_observability_config_numeric_normalization():
+    payload = _base_kwargs()
+    payload["SLOW_REQUEST_MS"] = "0"
+    payload["OBSERVABILITY_RECENT_ERROR_LIMIT"] = "-1"
+
+    cfg = Settings(**payload)
+    assert cfg.slow_request_ms == 1
+    assert cfg.observability_recent_error_limit == 1

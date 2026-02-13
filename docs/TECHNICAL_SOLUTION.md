@@ -95,6 +95,8 @@ flowchart LR
 - `DATABASE_URL`
 - `AUTH_MODE`
 - `MOCK_AUTH_ENABLED`
+- `SLOW_REQUEST_MS`
+- `OBSERVABILITY_RECENT_ERROR_LIMIT`
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `LLM_API_KEY`
@@ -112,9 +114,10 @@ flowchart LR
 补充:
 
 - 当前线上预检已包含历史回看接口校验（`GET /api/v1/sessions`、`GET /api/v1/sessions/{session_id}/history`）
+- 后端已提供最小可观测性端点 `GET /ops/metrics`（慢请求与 5xx 聚合）
 
 ## 9. 当前技术边界
 
 1. 远端 API 冒烟依赖执行环境网络可达性
 2. 本地 DB 集成测试依赖 Docker/本地 Postgres 环境
-3. 线上可观测性仍在增强中（日志聚合/告警未完全落地）
+3. 可观测性已具备本地聚合能力，外部日志平台与告警通道仍待接入

@@ -99,6 +99,8 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - `POST /api/v1/sessions/{session_id}/summary`
 - `POST /api/v1/reflections`
 - `GET /api/v1/progress/weekly`
+- `GET /health`
+- `GET /ops/metrics`
 
 ## Current Status
 
@@ -110,6 +112,12 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - AI generation supports ModelScope OpenAI-compatible API with local fallback
 - Unified error response contract (`error_code`, `message`, `request_id`)
 - Message API idempotency support (`client_message_id`)
+- Structured request log (JSON line) with request_id, route, status_code, latency_ms
+- In-memory observability metrics (`/ops/metrics`):
+  - request total
+  - status code counts
+  - slow request count (threshold by `SLOW_REQUEST_MS`)
+  - 5xx recent error aggregation
 - DB pooling strategy:
   - production/test: `NullPool` (serverless-safe, CI event-loop safe)
   - development: default pooled connections (better local stability)
@@ -126,6 +134,6 @@ Run in order:
 
 ## Next Implementation Steps
 
-1. Improve replay experience (turn jump/highlight and quick continue)
-2. Add stronger OFNR rubric and eval runner
-3. Add minimal observability dashboard and error alerting
+1. Add stronger OFNR rubric and eval runner
+2. Add dashboard/alert integration based on `/ops/metrics`
+3. Extend observability storage from memory to durable sink

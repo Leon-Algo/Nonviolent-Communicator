@@ -1,4 +1,6 @@
+import json
 import logging
+from time import perf_counter
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
@@ -19,8 +21,10 @@ from app.core.errors import (
     build_error_payload,
     map_status_to_error_code,
 )
+from app.core.observability import observability_registry
 
 logger = logging.getLogger("nvc.api")
+request_logger = logging.getLogger("nvc.api.request")
 
 
 def _request_id_from(request: Request) -> str:
@@ -28,6 +32,27 @@ def _request_id_from(request: Request) -> str:
     if isinstance(request_id, str) and request_id:
         return request_id
     return str(uuid4())
+
+
+def _route_template_from(request: Request) -> str:
+    route = request.scope.get("route")
+    template = getattr(route, "path", None)
+    if isinstance(template, str) and template:
+        return template
+    return request.url.path
+
+
+def _configure_logging() -> None:
+    normalized = settings.log_level.strip().upper()
+    level = getattr(logging, normalized, logging.INFO)
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+    logger.setLevel(level)
+    request_logger.setLevel(level)
 
 
 def _error_response(status_code: int, error_code: ErrorCode, message: str, request: Request):
@@ -42,6 +67,11 @@ def _error_response(status_code: int, error_code: ErrorCode, message: str, reque
 
 
 def create_app() -> FastAPI:
+    _configure_logging()
+    observability_registry.configure(
+        max_recent_errors=settings.observability_recent_error_limit
+    )
+    observability_registry.reset()
     app = FastAPI(
         title="NVC Practice Coach API",
         version="0.1.0",
@@ -62,9 +92,45 @@ def create_app() -> FastAPI:
     async def add_request_id_header(request: Request, call_next):
         request_id = request.headers.get("x-request-id", "").strip() or str(uuid4())
         request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
+        started_at = perf_counter()
+        response = None
+        status_code = 500
+        path = request.url.path
+        route = path
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            route = _route_template_from(request)
+            return response
+        finally:
+            latency_ms = (perf_counter() - started_at) * 1000
+            is_slow = latency_ms >= settings.slow_request_ms
+            observability_registry.observe(
+                request_id=request_id,
+                method=request.method,
+                path=path,
+                route=route,
+                status_code=status_code,
+                latency_ms=latency_ms,
+                is_slow=is_slow,
+            )
+            request_logger.info(
+                json.dumps(
+                    {
+                        "request_id": request_id,
+                        "method": request.method,
+                        "path": path,
+                        "route": route,
+                        "status_code": status_code,
+                        "latency_ms": round(latency_ms, 2),
+                        "is_slow": is_slow,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+            if response is not None:
+                response.headers["X-Request-ID"] = request_id
 
     @app.exception_handler(ApiError)
     async def api_error_handler(request: Request, exc: ApiError):

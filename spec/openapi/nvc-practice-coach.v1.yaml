@@ -11,11 +11,38 @@ servers:
 security:
   - bearerAuth: []
 tags:
+  - name: system
   - name: scenes
   - name: sessions
   - name: reflections
   - name: progress
 paths:
+  /health:
+    get:
+      tags: [system]
+      operationId: health
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Health response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /ops/metrics:
+    get:
+      tags: [system]
+      operationId: getObservabilityMetrics
+      summary: Get in-memory request observability metrics
+      security: []
+      responses:
+        '200':
+          description: Observability metrics snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObservabilityMetricsResponse'
   /scenes:
     post:
       tags: [scenes]
@@ -369,6 +396,96 @@ components:
             message: internal server error
             request_id: 5bf1a3a9-1dc8-4128-bff1-455713e6a0dc
   schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, app_env]
+      properties:
+        status:
+          type: string
+        app_env:
+          type: string
+    EndpointCountItem:
+      type: object
+      additionalProperties: false
+      required: [endpoint, count]
+      properties:
+        endpoint:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+    RecentErrorItem:
+      type: object
+      additionalProperties: false
+      required: [timestamp, request_id, method, path, route, status_code, latency_ms]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        request_id:
+          type: string
+        method:
+          type: string
+        path:
+          type: string
+        route:
+          type: string
+        status_code:
+          type: integer
+          minimum: 500
+        latency_ms:
+          type: number
+          minimum: 0
+    ObservabilityMetricsResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - started_at
+        - total_requests
+        - status_counts
+        - avg_latency_ms
+        - max_latency_ms
+        - slow_request_count
+        - server_error_count
+        - slow_request_threshold_ms
+        - top_endpoints
+        - recent_errors
+      properties:
+        started_at:
+          type: string
+          format: date-time
+        total_requests:
+          type: integer
+          minimum: 0
+        status_counts:
+          type: object
+          additionalProperties:
+            type: integer
+            minimum: 0
+        avg_latency_ms:
+          type: number
+          minimum: 0
+        max_latency_ms:
+          type: number
+          minimum: 0
+        slow_request_count:
+          type: integer
+          minimum: 0
+        server_error_count:
+          type: integer
+          minimum: 0
+        slow_request_threshold_ms:
+          type: integer
+          minimum: 1
+        top_endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/EndpointCountItem'
+        recent_errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentErrorItem'
     TemplateId:
       type: string
       enum: [PEER_FEEDBACK, MANAGER_ALIGNMENT, CROSS_TEAM_CONFLICT, CUSTOM]

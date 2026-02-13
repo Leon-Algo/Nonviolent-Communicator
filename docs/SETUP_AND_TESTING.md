@@ -77,6 +77,7 @@ pytest tests -q
 4. 在历史区测试筛选（状态/关键词/日期范围）并验证结果变化
 5. 加载历史会话后测试“跳到轮次”和“继续当前会话”交互
 6. 生成行动卡后测试“复制行动卡”和“导出 Markdown”按钮
+7. 访问 `GET /ops/metrics`，确认可看到 `slow_request_count` 与 `server_error_count`
 
 ## 5. 冒烟与预检（仓库根目录）
 
