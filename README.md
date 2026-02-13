@@ -1,12 +1,12 @@
 # Nonviolent-Communicator
 
 NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
-当前目标是让用户通过场景化对练、即时反馈和复盘，形成可迁移到真实对话的沟通能力。
+当前目标是让用户通过“登录 -> 对练 -> 复盘”的 3 步流程，形成可迁移到真实对话的沟通能力。
 
 ## 当前能力
 
 - 后端: FastAPI + PostgreSQL（Supabase）
-- 前端: 轻量联调与练习页（Vercel）
+- 前端: 引导式 3 步练习页（Vercel）
 - 鉴权: Supabase JWT（线上）+ Mock（本地开发）
 - AI: ModelScope OpenAI-compatible 接口
 - 核心链路: 场景 -> 会话 -> 消息反馈 -> 改写/总结 -> 复盘 -> 周进度

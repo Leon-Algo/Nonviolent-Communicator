@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NVC Practice Web</title>
+    <title>NVC Practice Coach</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,89 +13,100 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="bg-grid"></div>
-    <main class="container">
+    <div class="grain"></div>
+    <main class="shell">
       <header class="hero">
-        <p class="eyebrow">NVC MVP Playground</p>
-        <h1>非暴力沟通<br />在线练习台</h1>
-        <p class="sub">
-          前端仅用于 MVP 联调：创建场景、发起会话、发送练习消息并查看 OFNR 反馈。
-        </p>
+        <p class="eyebrow">NVC Practice Coach</p>
+        <h1>三步完成一次<br />非暴力沟通练习</h1>
+        <p class="sub">登录账号，输入真实场景，获取可直接使用的改写和行动卡。</p>
       </header>
 
-      <section class="card">
-        <h2>快速测试（2 步）</h2>
-        <p class="meta">先填邮箱和密码，点击“登录并获取 Token”；然后直接创建场景/会话/发送消息。</p>
-        <p class="meta">线上默认只开放 Supabase 鉴权；Mock 仅本地开发模式可见。</p>
+      <ol class="stepper" aria-label="练习步骤">
+        <li id="stepAuth" class="step is-active">
+          <span class="step-index">1</span>
+          <div>
+            <strong>登录账号</strong>
+            <p>获取 Supabase Token</p>
+          </div>
+        </li>
+        <li id="stepPractice" class="step">
+          <span class="step-index">2</span>
+          <div>
+            <strong>开始对练</strong>
+            <p>创建场景并发送消息</p>
+          </div>
+        </li>
+        <li id="stepReview" class="step">
+          <span class="step-index">3</span>
+          <div>
+            <strong>总结复盘</strong>
+            <p>行动卡与周进度</p>
+          </div>
+        </li>
+      </ol>
+
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>Step 1. 登录账号</h2>
+          <p class="badge">当前模式: <code id="currentAuthMode">supabase</code></p>
+        </div>
+        <p class="meta">线上只使用 Supabase 鉴权。注册后可直接登录获取 token。</p>
+
         <div class="grid two">
           <label>
-            Supabase Email
-            <input id="supabaseEmail" type="email" placeholder="test@example.com" />
-          </label>
-        </div>
-        <div class="grid two">
-          <label>
-            Supabase Password
-            <input id="supabasePassword" type="password" placeholder="your password" />
+            邮箱
+            <input id="supabaseEmail" type="email" placeholder="your-email@example.com" />
           </label>
           <label>
-            Access Token
-            <input id="supabaseAccessToken" type="text" placeholder="登录后自动填充，或手动粘贴" />
+            密码
+            <input id="supabasePassword" type="password" placeholder="至少 6 位" />
           </label>
         </div>
+
+        <label>
+          Access Token
+          <input id="supabaseAccessToken" type="text" placeholder="登录后自动填充" />
+        </label>
+
         <div class="actions">
-          <button id="supabaseSignupBtn" type="button">0) 注册测试账号</button>
-          <button id="supabaseLoginBtn" type="button">1) 登录并获取 Token</button>
-          <button id="clearTokenBtn" type="button" class="secondary">退出登录（清空 Token）</button>
-          <button id="useMockModeBtn" type="button" class="secondary" data-dev-only>切换到 Mock 快测</button>
-          <button id="saveConfigBtn" type="button" class="secondary">保存邮箱配置</button>
+          <button id="supabaseSignupBtn" type="button" class="tone-warm">注册</button>
+          <button id="supabaseLoginBtn" type="button">登录并获取 Token</button>
+          <button id="clearTokenBtn" type="button" class="tone-ghost">退出登录</button>
+          <button id="saveConfigBtn" type="button" class="tone-ghost">保存配置</button>
         </div>
-        <p class="meta">当前鉴权模式: <code id="currentAuthMode">supabase</code></p>
-        <details>
-          <summary>高级配置（一般不用改）</summary>
-          <div class="grid two">
-            <label>
-              API Base URL
-              <input id="apiBaseUrl" type="text" value="" placeholder="默认同域代理，不填即可" />
-            </label>
-            <label data-dev-only>
-              鉴权模式
-              <select id="authMode">
-                <option value="supabase">Supabase JWT</option>
-                <option value="mock">Mock</option>
-              </select>
-            </label>
-          </div>
-          <div class="grid two">
-            <label data-dev-only>
-              Mock User UUID
-              <input id="mockUserId" type="text" />
-            </label>
-            <label>
-              Supabase URL
-              <input id="supabaseUrl" type="text" placeholder="https://<project-ref>.supabase.co" />
-            </label>
-          </div>
-          <div class="grid two">
-            <label>
-              Supabase Anon Key
-              <input id="supabaseAnonKey" type="text" placeholder="sb_publishable_..." />
-            </label>
-            <span></span>
-          </div>
-          <div class="actions">
-            <button id="newUserBtn" type="button" data-dev-only>生成 Mock 用户</button>
-            <button id="useSupabaseModeBtn" type="button" data-dev-only>切换到 Supabase 模式</button>
-            <button id="useProxyBtn" type="button">切换同域代理</button>
-          </div>
-        </details>
+
+        <p id="noticeBar" class="notice is-hidden"></p>
       </section>
 
-      <section class="card">
-        <h2>1) 创建场景</h2>
+      <section class="panel">
+        <div class="panel-title-row">
+          <h2>Step 2. 开始对练</h2>
+          <div class="runtime-meta">
+            <span>scene: <code id="sceneIdValue">-</code></span>
+            <span>session: <code id="sessionIdValue">-</code></span>
+            <span>turn: <code id="currentTurnValue">0</code></span>
+          </div>
+        </div>
+
         <div class="grid two">
           <label>
-            标题
+            场景模板
+            <select id="templatePreset">
+              <option value="peer_delay">同事延期反馈</option>
+              <option value="manager_alignment">上级预期对齐</option>
+              <option value="cross_team_conflict">跨团队冲突协调</option>
+              <option value="custom">自定义</option>
+            </select>
+          </label>
+          <label>
+            目标轮数
+            <input id="targetTurns" type="number" min="5" max="8" value="6" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            场景标题
             <input id="sceneTitle" type="text" value="和同事沟通延期风险" />
           </label>
           <label>
@@ -103,46 +114,156 @@
             <input id="sceneGoal" type="text" value="确认新的里程碑并明确责任" />
           </label>
         </div>
+
         <label>
           场景背景
-          <textarea id="sceneContext" rows="3">这个需求已经两次延期，影响发布节奏</textarea>
+          <textarea id="sceneContext" rows="3">这个需求已经两次延期，影响发布节奏。</textarea>
         </label>
-        <div class="actions">
-          <button id="createSceneBtn" type="button">创建场景</button>
-        </div>
-        <p class="meta">scene_id: <code id="sceneIdValue">-</code></p>
-      </section>
 
-      <section class="card">
-        <h2>2) 创建会话</h2>
-        <div class="grid two">
-          <label>
-            目标轮数
-            <input id="targetTurns" type="number" min="5" max="8" value="6" />
-          </label>
-          <label>
-            当前 session_id
-            <input id="sessionIdInput" type="text" placeholder="自动填充或手动输入" />
-          </label>
-        </div>
-        <div class="actions">
-          <button id="createSessionBtn" type="button">创建会话</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2>3) 发送练习消息</h2>
         <label>
-          用户发言
+          你的发言
           <textarea id="messageContent" rows="3">你们总是拖延，根本不专业。</textarea>
         </label>
+
         <div class="actions">
-          <button id="sendMessageBtn" type="button">发送消息并获取反馈</button>
+          <button id="startPracticeBtn" type="button">创建场景并发送第 1 轮</button>
+          <button id="sendMessageBtn" type="button">继续下一轮</button>
+          <button id="newSessionBtn" type="button" class="tone-ghost">重置并开始新会话</button>
         </div>
       </section>
 
-      <section class="card">
-        <h2>响应面板</h2>
+      <section class="panel">
+        <h2>即时反馈</h2>
+        <div class="feedback-grid">
+          <article class="feedback-card">
+            <h3>AI 回复</h3>
+            <p id="assistantReply" class="assistant-reply">发送一条消息后，这里会显示对方回复。</p>
+          </article>
+          <article class="feedback-card">
+            <h3>结构化反馈</h3>
+            <div class="metric-row">
+              <span>总分</span>
+              <strong id="feedbackOverall">-</strong>
+            </div>
+            <div class="metric-row">
+              <span>风险等级</span>
+              <strong id="feedbackRisk">-</strong>
+            </div>
+            <p class="next-line">
+              <small>下一句建议</small>
+              <span id="nextSentence">-</span>
+            </p>
+            <ul class="ofnr-list">
+              <li><b>O</b> <span id="ofnrObservation">-</span></li>
+              <li><b>F</b> <span id="ofnrFeeling">-</span></li>
+              <li><b>N</b> <span id="ofnrNeed">-</span></li>
+              <li><b>R</b> <span id="ofnrRequest">-</span></li>
+            </ul>
+          </article>
+        </div>
+
+        <h3>会话记录</h3>
+        <div id="conversationList" class="conversation-list">
+          <p class="empty">还没有会话记录。</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Step 3. 总结与复盘</h2>
+        <div class="actions">
+          <button id="generateSummaryBtn" type="button">生成行动卡</button>
+          <button id="weeklyProgressBtn" type="button" class="tone-ghost">查看本周进度</button>
+        </div>
+
+        <div class="summary-grid">
+          <article class="summary-card">
+            <h3>行动卡</h3>
+            <p><small>开场句</small><span id="summaryOpening">-</span></p>
+            <p><small>请求句</small><span id="summaryRequest">-</span></p>
+            <p><small>兜底句</small><span id="summaryFallback">-</span></p>
+            <p><small>风险提醒</small><span id="summaryRisks">-</span></p>
+          </article>
+
+          <article class="summary-card">
+            <h3>次日复盘</h3>
+            <div class="grid two compact">
+              <label>
+                是否已用于真实对话
+                <select id="usedInRealWorld">
+                  <option value="true">是</option>
+                  <option value="false">否</option>
+                </select>
+              </label>
+              <label>
+                效果评分（1-5）
+                <input id="outcomeScore" type="number" min="1" max="5" placeholder="可选" />
+              </label>
+            </div>
+            <label>
+              备注（可选）
+              <textarea id="blockerNote" rows="2" placeholder="本次对话最大的阻碍是什么？"></textarea>
+            </label>
+            <button id="submitReflectionBtn" type="button">提交复盘</button>
+          </article>
+
+          <article class="summary-card">
+            <h3>周进度</h3>
+            <label>
+              week_start
+              <input id="progressWeekStart" type="date" />
+            </label>
+            <ul class="progress-list">
+              <li>练习次数 <strong id="progressPracticeCount">-</strong></li>
+              <li>总结次数 <strong id="progressSummaryCount">-</strong></li>
+              <li>真实应用 <strong id="progressRealCount">-</strong></li>
+              <li>平均得分 <strong id="progressOutcome">-</strong></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-dev-only>
+        <h2>开发者配置（仅本地 dev）</h2>
+        <div class="grid two">
+          <label>
+            API Base URL
+            <input id="apiBaseUrl" type="text" placeholder="默认同域代理" />
+          </label>
+          <label>
+            鉴权模式
+            <select id="authMode">
+              <option value="supabase">Supabase JWT</option>
+              <option value="mock">Mock</option>
+            </select>
+          </label>
+        </div>
+        <div class="grid two">
+          <label>
+            Mock User UUID
+            <input id="mockUserId" type="text" />
+          </label>
+          <label>
+            Supabase URL
+            <input id="supabaseUrl" type="text" placeholder="https://<project-ref>.supabase.co" />
+          </label>
+        </div>
+        <div class="grid two">
+          <label>
+            Supabase Anon Key
+            <input id="supabaseAnonKey" type="text" placeholder="sb_publishable_..." />
+          </label>
+          <span></span>
+        </div>
+        <div class="actions">
+          <button id="newUserBtn" type="button" class="tone-ghost">生成 Mock 用户</button>
+          <button id="useMockModeBtn" type="button" class="tone-warm">切到 Mock</button>
+          <button id="useSupabaseModeBtn" type="button" class="tone-ghost">切回 Supabase</button>
+          <button id="useProxyBtn" type="button" class="tone-ghost">切换同域代理</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>调试输出</h2>
         <pre id="output">{}</pre>
       </section>
     </main>

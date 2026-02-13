@@ -32,6 +32,15 @@
    - 发布前一键预检脚本
    - GitHub 手动预检 workflow
 
+### 2026-02-13
+
+关键进展:
+
+1. 前端从“联调台”重构为“引导式 3 步练习流”
+2. 登录、会话、反馈、行动卡、复盘、周进度统一在单页流程内串联
+3. 线上默认隐藏高级配置，仅在 dev 场景开放 mock 与调试项
+4. 增加会话记录和步骤状态可视化，降低测试认知成本
+
 ## 3. 关键问题与根因
 
 1. 前端 `Failed to fetch`
@@ -55,6 +64,7 @@
 2. 语法校验: `node --check web/app.js`、`bash -n` 脚本校验
 3. RLS 隔离: `bash scripts/rls_isolation_check.sh` 通过
 4. 一键预检: `SKIP_REMOTE_API_SMOKE=1 bash scripts/release_preflight.sh` 通过
+5. M3 页面交互链路已完成本地回归（登录、练习、总结复盘入口可达）
 
 说明:
 
