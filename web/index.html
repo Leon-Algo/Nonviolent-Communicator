@@ -228,10 +228,15 @@
         <div class="summary-grid">
           <article class="summary-card">
             <h3>行动卡</h3>
-            <p><small>开场句</small><span id="summaryOpening">-</span></p>
-            <p><small>请求句</small><span id="summaryRequest">-</span></p>
-            <p><small>兜底句</small><span id="summaryFallback">-</span></p>
-            <p><small>风险提醒</small><span id="summaryRisks">-</span></p>
+            <p class="meta" id="summaryMeta">尚未生成</p>
+            <p><small>开场句</small><span id="summaryOpening" class="summary-value">-</span></p>
+            <p><small>请求句</small><span id="summaryRequest" class="summary-value">-</span></p>
+            <p><small>兜底句</small><span id="summaryFallback" class="summary-value">-</span></p>
+            <p><small>风险提醒</small><span id="summaryRisks" class="summary-value">-</span></p>
+            <div class="actions summary-actions">
+              <button id="copySummaryBtn" type="button" class="tone-ghost">复制行动卡</button>
+              <button id="exportSummaryBtn" type="button" class="tone-ghost">导出 Markdown</button>
+            </div>
           </article>
 
           <article class="summary-card">
@@ -254,6 +259,7 @@
               <textarea id="blockerNote" rows="2" placeholder="本次对话最大的阻碍是什么？"></textarea>
             </label>
             <button id="submitReflectionBtn" type="button">提交复盘</button>
+            <p class="meta" id="reflectionMeta">尚未提交复盘</p>
           </article>
 
           <article class="summary-card">

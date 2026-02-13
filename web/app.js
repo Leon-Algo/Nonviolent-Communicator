@@ -59,6 +59,7 @@ const state = {
   lastUserMessageId: "",
   history: [],
   summary: null,
+  reflection: null,
   reflectionId: "",
 };
 
@@ -180,6 +181,7 @@ function persistRuntimeState() {
       lastUserMessageId: state.lastUserMessageId,
       history: state.history,
       summary: state.summary,
+      reflection: state.reflection,
       reflectionId: state.reflectionId,
     })
   );
@@ -198,6 +200,7 @@ function hydrateRuntimeState() {
   state.lastUserMessageId = parsed.lastUserMessageId || "";
   state.history = Array.isArray(parsed.history) ? parsed.history : [];
   state.summary = parsed.summary || null;
+  state.reflection = parsed.reflection || null;
   state.reflectionId = parsed.reflectionId || "";
 }
 
@@ -209,10 +212,13 @@ function resetRuntimeState() {
   state.lastUserMessageId = "";
   state.history = [];
   state.summary = null;
+  state.reflection = null;
   state.reflectionId = "";
   persistRuntimeState();
   renderHistory();
   renderSummary();
+  renderReflectionMeta();
+  applyReflectionToForm(null);
   clearFeedbackPanel();
   updateRuntimeMeta();
   updateStepState();
@@ -416,6 +422,25 @@ function renderSummary() {
   byId("summaryRisks").textContent = Array.isArray(summary?.risk_triggers)
     ? summary.risk_triggers.join("、") || "-"
     : "-";
+  byId("summaryMeta").textContent = summary?.created_at
+    ? `生成时间: ${formatDateTime(summary.created_at)}`
+    : "尚未生成";
+}
+
+function renderReflectionMeta() {
+  const reflection = state.reflection;
+  if (!reflection) {
+    byId("reflectionMeta").textContent = "尚未提交复盘";
+    return;
+  }
+
+  const used = reflection.used_in_real_world ? "已用于真实对话" : "未用于真实对话";
+  const score =
+    reflection.outcome_score === null || reflection.outcome_score === undefined
+      ? "无评分"
+      : `评分 ${reflection.outcome_score}/5`;
+  const time = reflection.created_at ? ` · ${formatDateTime(reflection.created_at)}` : "";
+  byId("reflectionMeta").textContent = `${used} · ${score}${time}`;
 }
 
 function renderProgress(progress) {
@@ -431,6 +456,71 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatNowForFilename() {
+  const date = new Date();
+  const pad = (num) => String(num).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(
+    date.getHours()
+  )}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
+
+function buildSummaryMarkdown() {
+  const summary = state.summary;
+  if (!summary) return "";
+  const risks =
+    Array.isArray(summary.risk_triggers) && summary.risk_triggers.length
+      ? summary.risk_triggers.map((item) => `- ${item}`).join("\n")
+      : "- 无";
+  return [
+    "# NVC 行动卡",
+    "",
+    `- 生成时间: ${formatDateTime(summary.created_at)}`,
+    `- 场景ID: ${state.sceneId || "-"}`,
+    `- 会话ID: ${state.sessionId || "-"}`,
+    "",
+    "## 开场句",
+    summary.opening_line || "-",
+    "",
+    "## 请求句",
+    summary.request_line || "-",
+    "",
+    "## 兜底句",
+    summary.fallback_line || "-",
+    "",
+    "## 风险提醒",
+    risks,
+    "",
+  ].join("\n");
+}
+
+async function copyText(text) {
+  if (!navigator.clipboard || !window.isSecureContext) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return;
+  }
+  await navigator.clipboard.writeText(text);
+}
+
+function downloadText(filename, content) {
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(href);
 }
 
 function setHighlightedText(element, content, keyword) {
@@ -857,7 +947,16 @@ async function submitReflection() {
   });
 
   state.reflectionId = data.reflection_id;
+  state.reflection = {
+    reflection_id: data.reflection_id,
+    used_in_real_world: payload.used_in_real_world,
+    outcome_score: payload.outcome_score,
+    blocker_code: payload.blocker_code,
+    blocker_note: payload.blocker_note,
+    created_at: data.created_at,
+  };
   persistRuntimeState();
+  renderReflectionMeta();
   updateStepState();
   setNotice("复盘已提交。", "success");
   setOutput(data);
@@ -941,6 +1040,7 @@ async function loadSessionHistory(sessionId) {
   state.turn = data.current_turn || 0;
   state.selectedTurn = data.current_turn || 0;
   state.summary = data.summary || null;
+  state.reflection = data.reflection || null;
   state.reflectionId = data.reflection?.reflection_id || "";
   state.history = (data.turns || []).map((turn) => ({
     turn: turn.turn,
@@ -957,6 +1057,7 @@ async function loadSessionHistory(sessionId) {
 
   renderHistory();
   renderSummary();
+  renderReflectionMeta();
   updateRuntimeMeta();
   updateStepState();
   applyReflectionToForm(data.reflection);
@@ -1010,9 +1111,10 @@ function bind() {
   updateRuntimeMeta();
   renderHistory();
   renderSummary();
+  renderReflectionMeta();
   byId("progressWeekStart").value = getCurrentWeekStart();
   syncOutcomeState();
-  applyReflectionToForm(null);
+  applyReflectionToForm(state.reflection);
   updateStepState();
 
   byId("templatePreset").addEventListener("change", applyTemplatePreset);
@@ -1069,6 +1171,27 @@ function bind() {
   });
 
   byId("generateSummaryBtn").addEventListener("click", () => generateSummary().catch(showError));
+  byId("copySummaryBtn").addEventListener("click", async () => {
+    if (!state.summary) {
+      setNotice("请先生成行动卡。", "warning");
+      return;
+    }
+    try {
+      await copyText(buildSummaryMarkdown());
+      setNotice("行动卡内容已复制。", "success");
+    } catch (error) {
+      showError(error);
+    }
+  });
+  byId("exportSummaryBtn").addEventListener("click", () => {
+    if (!state.summary) {
+      setNotice("请先生成行动卡。", "warning");
+      return;
+    }
+    const filename = `nvc_action_card_${formatNowForFilename()}.md`;
+    downloadText(filename, buildSummaryMarkdown());
+    setNotice("行动卡已导出为 Markdown。", "success");
+  });
   byId("submitReflectionBtn").addEventListener("click", () => submitReflection().catch(showError));
   byId("weeklyProgressBtn").addEventListener("click", () => fetchWeeklyProgress().catch(showError));
 

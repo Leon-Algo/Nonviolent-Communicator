@@ -446,6 +446,16 @@ mark {
   gap: 4px;
 }
 
+.summary-value {
+  display: inline-block;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.summary-actions {
+  margin-top: 8px;
+}
+
 pre {
   margin: 0;
   max-height: 300px;
