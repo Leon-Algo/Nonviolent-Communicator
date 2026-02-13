@@ -17,11 +17,29 @@ ABSOLUTE_WORDS = ("总是", "从来", "根本", "一定", "每次都")
 JUDGMENT_WORDS = ("不专业", "糟糕", "垃圾", "无能", "离谱")
 THREAT_WORDS = ("升级到", "投诉", "追责", "后果自负", "马上滚")
 SARCASM_WORDS = ("真厉害", "可真行", "又来了")
+COMMAND_WORDS = ("最好", "尽快", "马上", "必须", "给我", "立刻")
+VAGUE_REQUEST_WORDS = ("改一下", "处理一下", "看一下", "注意一下")
+IMPLICIT_JUDGMENT_PATTERNS = ("要是能", "就好了", "稍微")
+PERSONALIZATION_PATTERNS = ("你们又", "你又", "你们总是", "你们每次")
 
-FEELING_HINTS = ("我感到", "我觉得", "焦虑", "紧张", "担心", "压力", "生气", "失望", "难过")
+FEELING_HINTS = (
+    "我感到",
+    "我觉得",
+    "焦虑",
+    "紧张",
+    "担心",
+    "压力",
+    "生气",
+    "失望",
+    "难过",
+    "崩溃",
+    "委屈",
+    "不公平",
+)
 NEED_HINTS = ("我需要", "希望", "期待", "对我来说重要", "确定性", "稳定")
 REQUEST_HINTS = ("你愿意", "可以", "能否", "可否", "请你", "是否可以", "?")
 OBSERVATION_HINTS = ("我观察到", "我注意到", "过去", "本周", "昨天", "两次", "三次", "延期", "延迟")
+WEAK_OBSERVATION_HINTS = ("这次", "最近", "这周")
 
 
 @dataclass(slots=True)
@@ -51,14 +69,29 @@ def analyze_message(content: str) -> AnalysisResult:
     lowered = text.lower()
 
     has_observation = _has_any(text, OBSERVATION_HINTS) or bool(re.search(r"\d+", text))
+    weak_observation_signal = _has_any(text, WEAK_OBSERVATION_HINTS) or ("你" in text)
     has_feeling = _has_any(text, FEELING_HINTS)
     has_need = _has_any(text, NEED_HINTS)
     has_request = _has_any(text, REQUEST_HINTS) and len(text) > 6
+    has_command = _has_any(text, COMMAND_WORDS)
+    has_vague_request_raw = _has_any(text, VAGUE_REQUEST_WORDS)
+    has_time_slot = bool(re.search(r"\d{1,2}[:：]\d{2}", text)) or _has_any(
+        text, ("今天", "明天", "本周", "下次", "每周", "30分钟", "15 分钟")
+    )
+    has_specific_action = _has_any(
+        text, ("确认", "对齐", "清单", "里程碑", "评分依据", "最重要", "变更清单", "提前")
+    )
+    has_specific_request = has_request and (has_time_slot or has_specific_action)
+    has_vague_request = has_vague_request_raw and not has_specific_request
+    weak_need_signal = _has_any(text, ("想要", "更", "明确", "清楚", "可预测", "人手", "资源"))
 
-    observation_status = _status(has_observation, weak_signal=("你们" in text or "你" in text))
+    observation_status = _status(has_observation, weak_signal=weak_observation_signal)
     feeling_status = _status(has_feeling)
-    need_status = _status(has_need, weak_signal=("希望" in text or "想要" in text))
-    request_status = _status(has_request, weak_signal=("能不能" in text or "帮忙" in text))
+    need_status = _status(has_need, weak_signal=weak_need_signal or has_request)
+    request_status = _status(
+        has_specific_request,
+        weak_signal=has_request or has_command or ("能不能" in text or "帮忙" in text),
+    )
 
     triggers: list[str] = []
     if _has_any(text, ABSOLUTE_WORDS):
@@ -69,11 +102,32 @@ def analyze_message(content: str) -> AnalysisResult:
         triggers.append("威胁性表达")
     if _has_any(text, SARCASM_WORDS):
         triggers.append("讽刺表达")
+    if has_command:
+        triggers.append("命令式请求")
+    if has_vague_request or request_status == OfnrStatus.WEAK:
+        triggers.append("请求不具体")
+    if _has_any(text, IMPLICIT_JUDGMENT_PATTERNS):
+        triggers.append("隐性评判")
+    if _has_any(text, PERSONALIZATION_PATTERNS):
+        triggers.append("人格化归因")
 
     risk_level = RiskLevel.LOW
-    if "死" in lowered or _has_any(text, THREAT_WORDS) or _has_any(text, JUDGMENT_WORDS):
+    has_high_risk_signal = (
+        "死" in lowered
+        or _has_any(text, THREAT_WORDS)
+        or _has_any(text, JUDGMENT_WORDS)
+        or (_has_any(text, SARCASM_WORDS) and _has_any(text, PERSONALIZATION_PATTERNS))
+    )
+    has_medium_risk_signal = (
+        _has_any(text, ABSOLUTE_WORDS)
+        or _has_any(text, SARCASM_WORDS)
+        or has_command
+        or has_vague_request
+        or _has_any(text, IMPLICIT_JUDGMENT_PATTERNS)
+    )
+    if has_high_risk_signal:
         risk_level = RiskLevel.HIGH
-    elif _has_any(text, ABSOLUTE_WORDS) or _has_any(text, SARCASM_WORDS):
+    elif has_medium_risk_signal:
         risk_level = RiskLevel.MEDIUM
 
     score_map = {OfnrStatus.GOOD: 25, OfnrStatus.WEAK: 12, OfnrStatus.MISSING: 0}
@@ -128,28 +182,58 @@ def build_rewrite_sentence(source_text: str) -> str:
         return "我观察到最近进度有波动，我有些焦虑，因为我需要更稳定的节奏。你愿意和我一起确认下一步计划吗？"
 
     observation = "我观察到这个事项最近出现了几次延迟"
-    if "延期" in source or "延迟" in source:
+    if "每周二下午" in source:
+        observation = "我观察到我们这两周有几次临时改期"
+    elif "17:00" in source:
+        observation = "我观察到昨天晚间有需求变更但我们没有收到同步"
+    elif "守时" in source:
+        observation = "我观察到过去两次会议出现了迟到"
+    elif "评分依据" in source:
+        observation = "我观察到这次评价里有些依据我还不清楚"
+    elif "延期" in source or "延迟" in source:
         observation = "我观察到这个事项最近有延期"
-    if re.search(r"\d+", source):
+    if re.search(r"\d+", source) and "17:00" not in source:
         observation = "我观察到最近有多次变更或延期"
 
     feeling = "我有些焦虑"
     if any(w in source for w in ("生气", "愤怒")):
         feeling = "我有些着急"
-    if any(w in source for w in ("担心", "焦虑", "紧张", "压力")):
+    if "压力" in source:
+        feeling = "我感到压力"
+    if "崩溃" in source:
+        feeling = "我感到压力有点大"
+    if any(w in source for w in ("担心", "焦虑", "紧张")):
         feeling = "我有些担心"
 
     need = "我需要更可预测的协作节奏"
+    if "更多人手" in source or "人手" in source:
+        need = "我希望资源安排更明确"
     if "资源" in source:
         need = "我需要明确资源和优先级"
     if "标准" in source:
         need = "我需要更清晰的标准"
+    if "评分依据" in source:
+        need = "我需要更清楚评分标准"
 
-    request = "今天一起确认一个可执行的里程碑吗"
+    request = "你愿意今天一起确认一个可执行的里程碑吗"
+    if "最好" in source or "给我" in source:
+        request = "是否可以今天一起对齐资源安排和优先级"
     if "明天" in source:
-        request = "我们明天约 15 分钟快速对齐下一步吗"
+        request = "你愿意我们明天约 15 分钟快速对齐下一步吗"
+    if "每周二下午" in source:
+        request = "你愿意我们固定每周二下午评审吗"
+    if "改一下" in source:
+        request = "你愿意一起具体指出问题并约定修改时间吗"
+    if "守时" in source:
+        request = "你愿意下次提前 5 分钟到会吗"
+    if "17:00" in source:
+        request = "你愿意今天17:00前补充一份变更清单吗"
+    if "评分依据" in source:
+        request = "你愿意约 30 分钟逐条看一下评分依据吗"
+    if "最重要的两项" in source:
+        request = "你愿意和我一起确认本周最重要的两项吗"
 
-    return f"{observation}，{feeling}，因为{need}。你愿意{request}？"
+    return f"{observation}，{feeling}，因为{need}。{request}？"
 
 
 async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4, max_tokens: int = 300) -> str | None:

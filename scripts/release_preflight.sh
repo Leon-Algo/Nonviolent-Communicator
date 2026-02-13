@@ -7,6 +7,7 @@ cd "${ROOT_DIR}"
 API_BASE_URL="${1:-${API_BASE_URL:-https://nvc-practice-api.vercel.app}}"
 SKIP_REMOTE_API_SMOKE="${SKIP_REMOTE_API_SMOKE:-0}"
 SKIP_RLS_ISOLATION="${SKIP_RLS_ISOLATION:-0}"
+SKIP_OFNR_EVAL="${SKIP_OFNR_EVAL:-0}"
 RUN_DB_TESTS="${RUN_DB_TESTS:-0}"
 
 step() {
@@ -25,6 +26,7 @@ ensure_cmd() {
 ensure_cmd pytest
 ensure_cmd node
 ensure_cmd bash
+ensure_cmd python3
 
 step "backend tests"
 if [[ -f ".venv/bin/activate" ]]; then
@@ -33,10 +35,6 @@ if [[ -f ".venv/bin/activate" ]]; then
 fi
 RUN_DB_TESTS="${RUN_DB_TESTS}" pytest backend/tests -q
 
-if declare -F deactivate >/dev/null 2>&1; then
-  deactivate
-fi
-
 step "frontend script syntax"
 node --check web/app.js
 
@@ -44,6 +42,15 @@ step "shell script syntax"
 bash -n scripts/api_smoke_test.sh
 bash -n scripts/rls_isolation_check.sh
 bash -n scripts/supabase_jwt_api_smoke_test.sh
+bash -n scripts/release_preflight.sh
+
+if [[ "${SKIP_OFNR_EVAL}" == "1" ]]; then
+  echo
+  echo "[SKIP] OFNR eval skipped (SKIP_OFNR_EVAL=1)"
+else
+  step "OFNR eval regression"
+  python scripts/run_ofnr_eval.py
+fi
 
 if [[ "${SKIP_RLS_ISOLATION}" == "1" ]]; then
   echo
@@ -64,3 +71,7 @@ fi
 echo
 
 echo "[PASS] release preflight completed"
+
+if declare -F deactivate >/dev/null 2>&1; then
+  deactivate
+fi

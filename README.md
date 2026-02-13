@@ -12,6 +12,7 @@ NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
 - 核心链路: 场景 -> 会话 -> 消息反馈 -> 改写/总结 -> 复盘 -> 周进度
 - 历史回看: 跨会话历史列表 + 单会话完整回看
 - 可观测性: 结构化请求日志 + `/ops/metrics` 慢请求/5xx 聚合
+- AI 回归: `spec/evals/ofnr_evalset_v0.1.jsonl` 自动回归（预检内置）
 
 ## 仓库结构
 

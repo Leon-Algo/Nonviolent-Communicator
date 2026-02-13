@@ -106,15 +106,17 @@ flowchart LR
 ## 8. 测试与预检
 
 1. 单测: `pytest backend/tests -q`
-2. RLS 校验: `bash scripts/rls_isolation_check.sh`
-3. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
-4. 一键预检: `bash scripts/release_preflight.sh <api_url>`
-5. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
+2. OFNR 回归: `python scripts/run_ofnr_eval.py`
+3. RLS 校验: `bash scripts/rls_isolation_check.sh`
+4. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
+5. 一键预检: `bash scripts/release_preflight.sh <api_url>`
+6. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
 
 补充:
 
 - 当前线上预检已包含历史回看接口校验（`GET /api/v1/sessions`、`GET /api/v1/sessions/{session_id}/history`）
 - 后端已提供最小可观测性端点 `GET /ops/metrics`（慢请求与 5xx 聚合）
+- 预检已集成 OFNR eval 门禁（`overall` 与 `risk_accuracy` 阈值）
 
 ## 9. 当前技术边界
 

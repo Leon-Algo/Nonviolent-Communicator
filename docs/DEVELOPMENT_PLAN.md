@@ -31,6 +31,7 @@
 4. 发布前一键预检脚本
 5. GitHub Actions 手动预检 workflow
 6. 线上预检闭环已打通（RLS + JWT API smoke）
+7. OFNR evalset 回归脚本接入预检（阈值门禁）
 
 ### M3 产品可用性（P1）
 
@@ -76,7 +77,7 @@
 
 1. P1: 会话回看再增强（过滤条件持久化、分页、按风险分组）
 2. P1: 可观测性外接（日志平台/告警通道接入）
-3. P1: 建立最小 AI 质量回归（OFNR evalset 自动化执行）
+3. P1: AI 回归扩展（扩大 evalset + 在线模型回归模式）
 4. P1: 行动卡导出扩展（PDF/图片）与分享模板
 
 ## 4. 完成定义（Definition of Done）

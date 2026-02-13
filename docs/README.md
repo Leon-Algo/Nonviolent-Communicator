@@ -21,6 +21,7 @@
 
 - API 契约: `spec/openapi/nvc-practice-coach.v1.yaml`
 - AI 回归样本: `spec/evals/ofnr_evalset_v0.1.jsonl`
+- AI 回归脚本: `scripts/run_ofnr_eval.py`
 - 数据库迁移: `db/migrations/*.sql`
 
 ## 维护规则

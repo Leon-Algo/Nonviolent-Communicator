@@ -111,6 +111,17 @@ bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
 
+### 5.5 OFNR 回归评测
+
+```bash
+python scripts/run_ofnr_eval.py
+```
+
+可选门禁参数:
+
+- `OFNR_EVAL_MIN_OVERALL`（默认 `0.72`）
+- `OFNR_EVAL_MIN_RISK_ACCURACY`（默认 `0.75`）
+
 ## 6. GitHub Actions 手动预检
 
 工作流: `.github/workflows/release-preflight.yml`

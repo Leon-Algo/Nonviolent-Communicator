@@ -46,6 +46,8 @@ RLS/JWT smoke scripts (repo root):
 bash scripts/rls_isolation_check.sh
 bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+# OFNR regression eval
+python scripts/run_ofnr_eval.py
 # include DB integration tests in preflight
 RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
@@ -134,6 +136,6 @@ Run in order:
 
 ## Next Implementation Steps
 
-1. Add stronger OFNR rubric and eval runner
+1. Expand OFNR evalset and add online LLM eval mode
 2. Add dashboard/alert integration based on `/ops/metrics`
 3. Extend observability storage from memory to durable sink
