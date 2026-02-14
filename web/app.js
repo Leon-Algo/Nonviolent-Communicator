@@ -5,6 +5,8 @@ function byId(id) {
 const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
 const RUNTIME_STATE_KEY = "runtime_state_v2";
+const HISTORY_VIEW_STATE_KEY = "history_view_state_v1";
+const HISTORY_DEFAULT_LIMIT = 10;
 
 const TEMPLATE_PRESETS = {
   peer_delay: {
@@ -61,6 +63,9 @@ const state = {
   summary: null,
   reflection: null,
   reflectionId: "",
+  historyOffset: 0,
+  historyTotal: 0,
+  historyLimit: HISTORY_DEFAULT_LIMIT,
 };
 
 function isDevContext() {
@@ -554,6 +559,41 @@ function setHighlightedText(element, content, keyword) {
   }
 }
 
+function getBoundedHistoryLimit(raw) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return HISTORY_DEFAULT_LIMIT;
+  return Math.min(Math.max(parsed, 1), 50);
+}
+
+function persistHistoryViewState() {
+  const filters = getHistoryFilters();
+  const payload = {
+    ...filters,
+    limit: getBoundedHistoryLimit(byId("historyLimit").value || HISTORY_DEFAULT_LIMIT),
+    offset: state.historyOffset,
+  };
+  localStorage.setItem(HISTORY_VIEW_STATE_KEY, JSON.stringify(payload));
+}
+
+function hydrateHistoryViewState() {
+  const raw = localStorage.getItem(HISTORY_VIEW_STATE_KEY);
+  if (!raw) return;
+  const parsed = parseJson(raw, null);
+  if (!parsed || typeof parsed !== "object") return;
+
+  byId("historyLimit").value = String(getBoundedHistoryLimit(parsed.limit ?? HISTORY_DEFAULT_LIMIT));
+  byId("historyState").value = typeof parsed.state === "string" ? parsed.state : "";
+  byId("historyKeyword").value = typeof parsed.keyword === "string" ? parsed.keyword : "";
+  byId("historyCreatedFrom").value =
+    typeof parsed.created_from === "string" ? parsed.created_from : "";
+  byId("historyCreatedTo").value =
+    typeof parsed.created_to === "string" ? parsed.created_to : "";
+
+  const parsedOffset = Number(parsed.offset ?? 0);
+  state.historyOffset = Number.isFinite(parsedOffset) ? Math.max(0, parsedOffset) : 0;
+  state.historyLimit = getBoundedHistoryLimit(parsed.limit ?? HISTORY_DEFAULT_LIMIT);
+}
+
 function getHistoryFilters() {
   return {
     state: byId("historyState").value.trim(),
@@ -570,6 +610,23 @@ function updateHistoryFilterHint(filters) {
   if (filters.created_from) chips.push(`开始:${filters.created_from}`);
   if (filters.created_to) chips.push(`结束:${filters.created_to}`);
   byId("historyFilterHint").textContent = `当前筛选: ${chips.length ? chips.join(" / ") : "全部"}`;
+}
+
+function renderHistoryPagination(total, limit, offset) {
+  const normalizedTotal = Math.max(0, Number(total || 0));
+  const normalizedLimit = getBoundedHistoryLimit(limit || HISTORY_DEFAULT_LIMIT);
+  const normalizedOffset = Math.max(0, Number(offset || 0));
+  const totalPages = Math.max(1, Math.ceil(normalizedTotal / normalizedLimit));
+  const currentPage = normalizedTotal === 0 ? 1 : Math.floor(normalizedOffset / normalizedLimit) + 1;
+
+  state.historyTotal = normalizedTotal;
+  state.historyLimit = normalizedLimit;
+  state.historyOffset = normalizedOffset;
+
+  byId("historyPageMeta").textContent = `第 ${currentPage}/${totalPages} 页 · 共 ${normalizedTotal} 条`;
+  byId("historyPrevBtn").disabled = normalizedOffset <= 0;
+  byId("historyNextBtn").disabled =
+    normalizedTotal === 0 || normalizedOffset + normalizedLimit >= normalizedTotal;
 }
 
 function renderTurnJumpOptions() {
@@ -634,6 +691,49 @@ function applyReflectionToForm(reflection) {
   syncOutcomeState();
 }
 
+function buildHistorySessionCard(item, keyword = "") {
+  const card = document.createElement("article");
+  card.className = "history-session-card";
+
+  const head = document.createElement("p");
+  head.className = "history-session-head";
+  head.textContent = `${formatDateTime(item.created_at)} · ${item.state} · ${item.current_turn}/${item.target_turns} 轮`;
+
+  const title = document.createElement("p");
+  title.className = "history-session-title";
+  setHighlightedText(title, item.scene_title || "未命名场景", keyword);
+
+  const snippet = document.createElement("p");
+  snippet.className = "history-session-snippet";
+  setHighlightedText(snippet, item.last_user_message || "本会话尚无用户消息", keyword);
+
+  const actions = document.createElement("div");
+  actions.className = "history-session-actions";
+
+  const loadBtn = document.createElement("button");
+  loadBtn.type = "button";
+  loadBtn.className = "tone-ghost";
+  loadBtn.textContent = "回看会话";
+  loadBtn.addEventListener("click", () => loadSessionHistory(item.session_id).catch(showError));
+
+  if (item.state === "ACTIVE") {
+    const continueBtn = document.createElement("button");
+    continueBtn.type = "button";
+    continueBtn.textContent = "继续练习";
+    continueBtn.addEventListener("click", () =>
+      continueSessionFromHistory(item.session_id).catch(showError)
+    );
+    actions.appendChild(continueBtn);
+  }
+
+  actions.appendChild(loadBtn);
+  card.appendChild(head);
+  card.appendChild(title);
+  card.appendChild(snippet);
+  card.appendChild(actions);
+  return card;
+}
+
 function renderSessionHistoryList(items, keyword = "") {
   const container = byId("historySessionList");
   container.innerHTML = "";
@@ -646,47 +746,45 @@ function renderSessionHistoryList(items, keyword = "") {
     return;
   }
 
+  const riskGroups = {
+    HIGH: [],
+    MEDIUM: [],
+    LOW: [],
+    NONE: [],
+  };
+
   items.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "history-session-card";
+    const key = item.last_risk_level || "NONE";
+    if (!Object.prototype.hasOwnProperty.call(riskGroups, key)) {
+      riskGroups.NONE.push(item);
+      return;
+    }
+    riskGroups[key].push(item);
+  });
+
+  const groupOrder = [
+    { key: "HIGH", label: "高风险会话" },
+    { key: "MEDIUM", label: "中风险会话" },
+    { key: "LOW", label: "低风险会话" },
+    { key: "NONE", label: "未评估会话" },
+  ];
+
+  groupOrder.forEach((group) => {
+    const groupedItems = riskGroups[group.key];
+    if (!groupedItems.length) return;
+
+    const wrapper = document.createElement("section");
+    wrapper.className = "history-risk-group";
 
     const head = document.createElement("p");
-    head.className = "history-session-head";
-    head.textContent = `${formatDateTime(item.created_at)} · ${item.state} · ${item.current_turn}/${item.target_turns} 轮`;
+    head.className = "history-risk-head";
+    head.textContent = `${group.label} (${groupedItems.length})`;
+    wrapper.appendChild(head);
 
-    const title = document.createElement("p");
-    title.className = "history-session-title";
-    setHighlightedText(title, item.scene_title || "未命名场景", keyword);
-
-    const snippet = document.createElement("p");
-    snippet.className = "history-session-snippet";
-    setHighlightedText(snippet, item.last_user_message || "本会话尚无用户消息", keyword);
-
-    const actions = document.createElement("div");
-    actions.className = "history-session-actions";
-
-    const loadBtn = document.createElement("button");
-    loadBtn.type = "button";
-    loadBtn.className = "tone-ghost";
-    loadBtn.textContent = "回看会话";
-    loadBtn.addEventListener("click", () => loadSessionHistory(item.session_id).catch(showError));
-
-    if (item.state === "ACTIVE") {
-      const continueBtn = document.createElement("button");
-      continueBtn.type = "button";
-      continueBtn.textContent = "继续练习";
-      continueBtn.addEventListener("click", () =>
-        continueSessionFromHistory(item.session_id).catch(showError)
-      );
-      actions.appendChild(continueBtn);
-    }
-
-    actions.appendChild(loadBtn);
-    card.appendChild(head);
-    card.appendChild(title);
-    card.appendChild(snippet);
-    card.appendChild(actions);
-    container.appendChild(card);
+    groupedItems.forEach((item) => {
+      wrapper.appendChild(buildHistorySessionCard(item, keyword));
+    });
+    container.appendChild(wrapper);
   });
 }
 
@@ -986,14 +1084,27 @@ function resetHistoryFilters() {
   byId("historyKeyword").value = "";
   byId("historyCreatedFrom").value = "";
   byId("historyCreatedTo").value = "";
+  state.historyOffset = 0;
   updateHistoryFilterHint(getHistoryFilters());
+  persistHistoryViewState();
 }
 
 async function fetchSessionHistoryList(options = {}) {
-  const { silent = false, setOutputPanel = false } = options;
+  const {
+    silent = false,
+    setOutputPanel = false,
+    resetOffset = false,
+    offsetOverride = null,
+    _retry = false,
+  } = options;
   const config = getConfig({ requireAuthToken: true });
-  const limit = Number(byId("historyLimit").value || 10);
-  const boundedLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 50) : 10;
+  const boundedLimit = getBoundedHistoryLimit(byId("historyLimit").value || HISTORY_DEFAULT_LIMIT);
+  if (resetOffset) {
+    state.historyOffset = 0;
+  }
+  if (Number.isInteger(offsetOverride) && offsetOverride >= 0) {
+    state.historyOffset = offsetOverride;
+  }
   const filters = getHistoryFilters();
 
   if (filters.created_from && filters.created_to && filters.created_from > filters.created_to) {
@@ -1002,7 +1113,7 @@ async function fetchSessionHistoryList(options = {}) {
 
   const query = new URLSearchParams({
     limit: String(boundedLimit),
-    offset: "0",
+    offset: String(state.historyOffset),
   });
   if (filters.state) query.set("state", filters.state);
   if (filters.keyword) query.set("keyword", filters.keyword);
@@ -1016,15 +1127,43 @@ async function fetchSessionHistoryList(options = {}) {
       headers: authHeaders(config),
     }
   );
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const total = Number(data.total || 0);
+  const currentOffset = Number(data.offset ?? state.historyOffset);
+
+  if (!_retry && total > 0 && items.length === 0 && currentOffset > 0) {
+    const fallbackOffset = Math.max(0, Math.floor((total - 1) / boundedLimit) * boundedLimit);
+    return fetchSessionHistoryList({
+      ...options,
+      offsetOverride: fallbackOffset,
+      silent: true,
+      _retry: true,
+    });
+  }
+
+  state.historyOffset = Number.isFinite(currentOffset) ? Math.max(0, currentOffset) : 0;
+  state.historyTotal = total;
+  state.historyLimit = boundedLimit;
+  persistHistoryViewState();
   updateHistoryFilterHint(filters);
-  renderSessionHistoryList(data.items || [], filters.keyword);
+  renderHistoryPagination(total, boundedLimit, state.historyOffset);
+  renderSessionHistoryList(items, filters.keyword);
   if (!silent) {
-    setNotice(`历史会话已刷新，共 ${data.total ?? 0} 条。`, "success");
+    const currentPage = total === 0 ? 1 : Math.floor(state.historyOffset / boundedLimit) + 1;
+    setNotice(`历史会话已刷新，共 ${total} 条（第 ${currentPage} 页）。`, "success");
   }
   if (setOutputPanel) {
-    setOutput(data);
+    setOutput({
+      ...data,
+      paging: {
+        offset: state.historyOffset,
+        limit: boundedLimit,
+        total,
+      },
+    });
   }
-  return data;
+  return { ...data, items, total };
 }
 
 async function loadSessionHistory(sessionId) {
@@ -1107,7 +1246,9 @@ function bind() {
   applyModeVisibility();
   loadConfig();
   hydrateRuntimeState();
+  hydrateHistoryViewState();
   updateHistoryFilterHint(getHistoryFilters());
+  renderHistoryPagination(state.historyTotal, state.historyLimit, state.historyOffset);
   updateRuntimeMeta();
   renderHistory();
   renderSummary();
@@ -1126,6 +1267,10 @@ function bind() {
   byId("clearTokenBtn").addEventListener("click", () => {
     byId("supabaseAccessToken").value = "";
     localStorage.removeItem("supabase_access_token");
+    state.historyOffset = 0;
+    state.historyTotal = 0;
+    persistHistoryViewState();
+    renderHistoryPagination(0, getBoundedHistoryLimit(byId("historyLimit").value), 0);
     renderSessionHistoryList([]);
     updateStepState();
     setNotice("已清空 Access Token。", "success");
@@ -1133,11 +1278,35 @@ function bind() {
 
   byId("saveConfigBtn").addEventListener("click", saveConfig);
   byId("refreshHistoryBtn").addEventListener("click", () =>
-    fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError)
+    fetchSessionHistoryList({ silent: false, setOutputPanel: true, resetOffset: true }).catch(showError)
   );
   byId("resetHistoryFiltersBtn").addEventListener("click", () => {
     resetHistoryFilters();
-    fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError);
+    fetchSessionHistoryList({ silent: false, setOutputPanel: true, resetOffset: true }).catch(
+      showError
+    );
+  });
+  byId("historyPrevBtn").addEventListener("click", () => {
+    const nextOffset = Math.max(0, state.historyOffset - state.historyLimit);
+    fetchSessionHistoryList({
+      silent: false,
+      setOutputPanel: true,
+      offsetOverride: nextOffset,
+    }).catch(showError);
+  });
+  byId("historyNextBtn").addEventListener("click", () => {
+    const nextOffset = state.historyOffset + state.historyLimit;
+    fetchSessionHistoryList({
+      silent: false,
+      setOutputPanel: true,
+      offsetOverride: nextOffset,
+    }).catch(showError);
+  });
+  byId("historyLimit").addEventListener("change", () => {
+    byId("historyLimit").value = String(getBoundedHistoryLimit(byId("historyLimit").value));
+    fetchSessionHistoryList({ silent: false, setOutputPanel: true, resetOffset: true }).catch(
+      showError
+    );
   });
   byId("turnJumpSelect").addEventListener("change", (event) => {
     jumpToTurn(event.target.value);
@@ -1154,7 +1323,9 @@ function bind() {
   byId("historyKeyword").addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      fetchSessionHistoryList({ silent: false, setOutputPanel: true }).catch(showError);
+      fetchSessionHistoryList({ silent: false, setOutputPanel: true, resetOffset: true }).catch(
+        showError
+      );
     }
   });
 
@@ -1231,6 +1402,7 @@ function bind() {
   if (mode === "mock" || hasToken) {
     fetchSessionHistoryList({ silent: true }).catch(() => {});
   } else {
+    renderHistoryPagination(0, getBoundedHistoryLimit(byId("historyLimit").value), 0);
     renderSessionHistoryList([]);
   }
 }

@@ -244,6 +244,16 @@ select:focus {
   min-width: 140px;
 }
 
+.history-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 button {
   border: 2px solid var(--line);
   background: var(--accent);
@@ -366,6 +376,17 @@ button.tone-ghost {
   margin-bottom: 8px;
   display: grid;
   gap: 6px;
+}
+
+.history-risk-group {
+  margin-bottom: 10px;
+}
+
+.history-risk-head {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 .history-session-head {
