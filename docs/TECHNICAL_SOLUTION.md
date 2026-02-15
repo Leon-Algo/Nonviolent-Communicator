@@ -103,6 +103,10 @@ flowchart LR
    - 安装入口（Install Prompt）
    - 离线状态提示
    - 新版本可更新提示
+5. 离线快照策略
+   - 历史会话列表本地快照（默认最近 20 条）
+   - 单会话详情本地快照（按会话 id 存储）
+   - 离线时优先回退到本地快照
 
 ### 7.3 关键环境变量
 
@@ -141,6 +145,7 @@ flowchart LR
 - 可通过 `RUN_ONLINE_OFNR_EVAL=1` 启用在线模型回归（建议灰度启用）
 - 在线回归默认采样 `8` 条（`OFNR_ONLINE_EVAL_MAX_CASES`），避免配额与限流导致大面积失败
 - GitHub Actions `release-preflight` 已支持 `run_online_ofnr_eval` 手动参数
+- PWA 冒烟脚本: `bash scripts/pwa_smoke_check.sh`
 
 ## 9. 当前技术边界
 

@@ -71,6 +71,32 @@ h1 {
   max-width: 56ch;
 }
 
+.pwa-meta {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pwa-network-bar {
+  margin: 8px 0 0;
+  border: 2px solid var(--warn);
+  background: #fff5e7;
+  color: #7d3e00;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pwa-network-bar.is-online {
+  border-color: var(--ok);
+  background: #ebf8ef;
+  color: var(--ok);
+}
+
+.pwa-top-actions {
+  margin-top: 10px;
+}
+
 .stepper {
   margin: 0;
   padding: 0;

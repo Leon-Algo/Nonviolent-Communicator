@@ -7,6 +7,23 @@ const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M8
 const RUNTIME_STATE_KEY = "runtime_state_v2";
 const HISTORY_VIEW_STATE_KEY = "history_view_state_v1";
 const HISTORY_DEFAULT_LIMIT = 10;
+const PWA_ENABLED_KEY = "pwa_enabled_v1";
+const PWA_DEFAULT_ENABLED = true;
+const HISTORY_LIST_SNAPSHOT_KEY = "history_list_snapshot_v1";
+const HISTORY_DETAIL_SNAPSHOT_PREFIX = "history_detail_snapshot_v1:";
+const HISTORY_SNAPSHOT_MAX_ITEMS = 20;
+
+function resolvePwaEnabled() {
+  const query = new URLSearchParams(window.location.search);
+  const queryValue = query.get("pwa");
+  if (queryValue === "0") return false;
+  if (queryValue === "1") return true;
+
+  const storedValue = localStorage.getItem(PWA_ENABLED_KEY);
+  if (storedValue === "0") return false;
+  if (storedValue === "1") return true;
+  return PWA_DEFAULT_ENABLED;
+}
 
 const TEMPLATE_PRESETS = {
   peer_delay: {
@@ -52,6 +69,14 @@ const TEMPLATE_PRESETS = {
 };
 
 const DEV_CONTEXT = isDevContext();
+const pwa = {
+  enabled: resolvePwaEnabled(),
+  deferredInstallPrompt: null,
+  registration: null,
+  updateReady: false,
+  networkBarTimer: null,
+  isReloadingForUpdate: false,
+};
 
 const state = {
   sceneId: "",
@@ -97,6 +122,249 @@ function parseJson(text, fallback = {}) {
   } catch {
     return fallback;
   }
+}
+
+function isOfflineLikeError(error) {
+  const message = String(error?.message || error || "");
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("offline") ||
+    normalized.includes("failed to fetch") ||
+    normalized.includes("networkerror") ||
+    normalized.includes("service unavailable")
+  );
+}
+
+function persistHistoryListSnapshot(items, meta = {}) {
+  const normalizedItems = Array.isArray(items) ? items.slice(0, HISTORY_SNAPSHOT_MAX_ITEMS) : [];
+  const payload = {
+    items: normalizedItems,
+    total: Number(meta.total || normalizedItems.length),
+    limit: Number(meta.limit || normalizedItems.length),
+    offset: Number(meta.offset || 0),
+    updated_at: new Date().toISOString(),
+  };
+  localStorage.setItem(HISTORY_LIST_SNAPSHOT_KEY, JSON.stringify(payload));
+}
+
+function loadHistoryListSnapshot() {
+  const raw = localStorage.getItem(HISTORY_LIST_SNAPSHOT_KEY);
+  if (!raw) return null;
+  const parsed = parseJson(raw, null);
+  if (!parsed || typeof parsed !== "object") return null;
+  return parsed;
+}
+
+function persistHistoryDetailSnapshot(sessionId, payload) {
+  if (!sessionId || !payload || typeof payload !== "object") return;
+  localStorage.setItem(
+    `${HISTORY_DETAIL_SNAPSHOT_PREFIX}${sessionId}`,
+    JSON.stringify({
+      ...payload,
+      _snapshot_saved_at: new Date().toISOString(),
+    })
+  );
+}
+
+function loadHistoryDetailSnapshot(sessionId) {
+  if (!sessionId) return null;
+  const raw = localStorage.getItem(`${HISTORY_DETAIL_SNAPSHOT_PREFIX}${sessionId}`);
+  if (!raw) return null;
+  const parsed = parseJson(raw, null);
+  if (!parsed || typeof parsed !== "object") return null;
+  return parsed;
+}
+
+function persistPwaEnabled(enabled) {
+  localStorage.setItem(PWA_ENABLED_KEY, enabled ? "1" : "0");
+}
+
+function setPwaModeBadge(text) {
+  const el = byId("pwaModeValue");
+  if (!el) return;
+  el.textContent = text;
+}
+
+function setPwaNetworkBar(text, tone = "offline", options = {}) {
+  const { autoHideMs = 0 } = options;
+  const bar = byId("pwaNetworkBar");
+  if (!bar) return;
+  bar.textContent = text;
+  bar.classList.remove("is-hidden", "is-online");
+  if (tone === "online") {
+    bar.classList.add("is-online");
+  }
+  if (pwa.networkBarTimer) {
+    window.clearTimeout(pwa.networkBarTimer);
+    pwa.networkBarTimer = null;
+  }
+  if (autoHideMs > 0) {
+    pwa.networkBarTimer = window.setTimeout(() => {
+      bar.classList.add("is-hidden");
+      pwa.networkBarTimer = null;
+    }, autoHideMs);
+  }
+}
+
+function hidePwaNetworkBar() {
+  const bar = byId("pwaNetworkBar");
+  if (!bar) return;
+  if (pwa.networkBarTimer) {
+    window.clearTimeout(pwa.networkBarTimer);
+    pwa.networkBarTimer = null;
+  }
+  bar.classList.add("is-hidden");
+}
+
+function updatePwaActionButtons() {
+  const installBtn = byId("installAppBtn");
+  const updateBtn = byId("updateAppBtn");
+  if (installBtn) {
+    const canInstall = pwa.enabled && Boolean(pwa.deferredInstallPrompt);
+    installBtn.classList.toggle("is-hidden", !canInstall);
+  }
+  if (updateBtn) {
+    const hasUpdate = pwa.enabled && pwa.updateReady;
+    updateBtn.classList.toggle("is-hidden", !hasUpdate);
+  }
+}
+
+function refreshPwaModeBadge() {
+  if (!pwa.enabled) {
+    setPwaModeBadge("DISABLED");
+    return;
+  }
+  if (!("serviceWorker" in navigator)) {
+    setPwaModeBadge("UNSUPPORTED");
+    return;
+  }
+  setPwaModeBadge("ENABLED");
+}
+
+function refreshPwaNetworkState({ showOnlineHint = false } = {}) {
+  if (!pwa.enabled) {
+    hidePwaNetworkBar();
+    return;
+  }
+  if (!navigator.onLine) {
+    setPwaNetworkBar("当前离线，可浏览缓存页面；提交数据需恢复网络。", "offline");
+    return;
+  }
+  if (showOnlineHint) {
+    setPwaNetworkBar("网络已恢复，可继续在线练习。", "online", { autoHideMs: 2800 });
+    return;
+  }
+  hidePwaNetworkBar();
+}
+
+function bindPwaRuntimeSignals() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    pwa.deferredInstallPrompt = event;
+    updatePwaActionButtons();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    pwa.deferredInstallPrompt = null;
+    updatePwaActionButtons();
+    setNotice("应用已安装，可从桌面直接打开。", "success");
+  });
+
+  window.addEventListener("offline", () => refreshPwaNetworkState());
+  window.addEventListener("online", () => refreshPwaNetworkState({ showOnlineHint: true }));
+}
+
+function markPwaUpdateReady() {
+  pwa.updateReady = true;
+  updatePwaActionButtons();
+  setPwaNetworkBar("检测到新版本，可点击“更新版本”完成切换。", "online");
+}
+
+function bindServiceWorkerUpdateEvents(registration) {
+  if (!registration) return;
+  if (registration.waiting) {
+    markPwaUpdateReady();
+  }
+  registration.addEventListener("updatefound", () => {
+    const worker = registration.installing;
+    if (!worker) return;
+    worker.addEventListener("statechange", () => {
+      if (worker.state === "installed" && navigator.serviceWorker.controller) {
+        markPwaUpdateReady();
+      }
+    });
+  });
+}
+
+async function unregisterAllServiceWorkers() {
+  if (!("serviceWorker" in navigator)) return 0;
+  const registrations = await navigator.serviceWorker.getRegistrations();
+  await Promise.all(registrations.map((item) => item.unregister()));
+  return registrations.length;
+}
+
+async function registerPwaServiceWorker() {
+  if (!pwa.enabled) return;
+  if (!("serviceWorker" in navigator)) return;
+  const registration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+  pwa.registration = registration;
+  bindServiceWorkerUpdateEvents(registration);
+}
+
+async function applyPwaUpdate() {
+  if (!pwa.registration) {
+    throw new Error("尚未获取 Service Worker 注册信息");
+  }
+  if (!pwa.registration.waiting) {
+    await pwa.registration.update();
+  }
+  if (!pwa.registration.waiting) {
+    setPwaNetworkBar("当前已经是最新版本。", "online", { autoHideMs: 2600 });
+    pwa.updateReady = false;
+    updatePwaActionButtons();
+    return;
+  }
+  pwa.registration.waiting.postMessage({ type: "SKIP_WAITING" });
+}
+
+async function promptPwaInstall() {
+  const prompt = pwa.deferredInstallPrompt;
+  if (!prompt) {
+    throw new Error("当前环境暂不支持安装提示");
+  }
+  await prompt.prompt();
+  pwa.deferredInstallPrompt = null;
+  updatePwaActionButtons();
+}
+
+async function setPwaEnabled(enabled) {
+  persistPwaEnabled(enabled);
+  pwa.enabled = enabled;
+  refreshPwaModeBadge();
+  updatePwaActionButtons();
+}
+
+async function initPwaRuntime() {
+  bindPwaRuntimeSignals();
+  refreshPwaModeBadge();
+  updatePwaActionButtons();
+  refreshPwaNetworkState();
+
+  if (!pwa.enabled) {
+    await unregisterAllServiceWorkers().catch(() => {});
+    return;
+  }
+  if (!("serviceWorker" in navigator)) {
+    setPwaNetworkBar("当前浏览器不支持 Service Worker，无法启用离线能力。", "offline");
+    return;
+  }
+
+  await registerPwaServiceWorker();
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (pwa.isReloadingForUpdate) return;
+    pwa.isReloadingForUpdate = true;
+    window.location.reload();
+  });
 }
 
 function setOutput(value) {
@@ -1391,13 +1659,50 @@ async function fetchSessionHistoryList(options = {}) {
   if (filters.created_from) query.set("created_from", filters.created_from);
   if (filters.created_to) query.set("created_to", filters.created_to);
 
-  const data = await callApi(
-    `${config.apiBaseUrl}/api/v1/sessions?${query.toString()}`,
-    {
-      method: "GET",
-      headers: authHeaders(config),
+  let data;
+  try {
+    data = await callApi(
+      `${config.apiBaseUrl}/api/v1/sessions?${query.toString()}`,
+      {
+        method: "GET",
+        headers: authHeaders(config),
+      }
+    );
+  } catch (error) {
+    const filtersEnabled = Boolean(
+      filters.state || filters.keyword || filters.created_from || filters.created_to
+    );
+    if (!filtersEnabled && isOfflineLikeError(error)) {
+      const snapshot = loadHistoryListSnapshot();
+      if (snapshot && Array.isArray(snapshot.items) && snapshot.items.length > 0) {
+        const snapshotItems = snapshot.items;
+        const snapshotTotal = Number(snapshot.total || snapshotItems.length);
+        state.historyOffset = 0;
+        state.historyTotal = snapshotTotal;
+        state.historyLimit = getBoundedHistoryLimit(
+          snapshot.limit || byId("historyLimit").value || HISTORY_DEFAULT_LIMIT
+        );
+        updateHistoryFilterHint(filters);
+        renderHistoryPagination(snapshotTotal, state.historyLimit, state.historyOffset);
+        renderSessionHistoryList(snapshotItems, "");
+        if (!silent) {
+          const updatedAt = snapshot.updated_at ? formatDateTime(snapshot.updated_at) : "未知";
+          setNotice(`当前离线，已展示本地快照（更新于 ${updatedAt}）。`, "warning");
+        }
+        if (setOutputPanel) {
+          setOutput({ offline_snapshot: true, ...snapshot });
+        }
+        return {
+          items: snapshotItems,
+          total: snapshotTotal,
+          offset: 0,
+          limit: state.historyLimit,
+          offline_snapshot: true,
+        };
+      }
     }
-  );
+    throw error;
+  }
 
   const items = Array.isArray(data.items) ? data.items : [];
   const total = Number(data.total || 0);
@@ -1417,6 +1722,19 @@ async function fetchSessionHistoryList(options = {}) {
   state.historyTotal = total;
   state.historyLimit = boundedLimit;
   persistHistoryViewState();
+  if (
+    !filters.state &&
+    !filters.keyword &&
+    !filters.created_from &&
+    !filters.created_to &&
+    state.historyOffset === 0
+  ) {
+    persistHistoryListSnapshot(items, {
+      total,
+      limit: boundedLimit,
+      offset: state.historyOffset,
+    });
+  }
   updateHistoryFilterHint(filters);
   renderHistoryPagination(total, boundedLimit, state.historyOffset);
   renderSessionHistoryList(items, filters.keyword);
@@ -1437,14 +1755,8 @@ async function fetchSessionHistoryList(options = {}) {
   return { ...data, items, total };
 }
 
-async function loadSessionHistory(sessionId) {
-  clearNotice();
-  const config = getConfig({ requireAuthToken: true });
-  const data = await callApi(`${config.apiBaseUrl}/api/v1/sessions/${sessionId}/history`, {
-    method: "GET",
-    headers: authHeaders(config),
-  });
-
+function applySessionHistoryPayload(data, options = {}) {
+  const { source = "remote" } = options;
   state.sceneId = data.scene.scene_id;
   state.sessionId = data.session_id;
   state.turn = data.current_turn || 0;
@@ -1482,8 +1794,35 @@ async function loadSessionHistory(sessionId) {
   }
 
   persistRuntimeState();
-  setNotice("会话已加载，可继续回看或继续练习。", "success");
+  if (source === "snapshot") {
+    setNotice("当前离线，已加载本地会话快照。", "warning");
+  } else {
+    setNotice("会话已加载，可继续回看或继续练习。", "success");
+  }
   setOutput(data);
+}
+
+async function loadSessionHistory(sessionId) {
+  clearNotice();
+  const config = getConfig({ requireAuthToken: true });
+  try {
+    const data = await callApi(`${config.apiBaseUrl}/api/v1/sessions/${sessionId}/history`, {
+      method: "GET",
+      headers: authHeaders(config),
+    });
+    persistHistoryDetailSnapshot(sessionId, data);
+    applySessionHistoryPayload(data, { source: "remote" });
+    return;
+  } catch (error) {
+    if (isOfflineLikeError(error)) {
+      const snapshot = loadHistoryDetailSnapshot(sessionId);
+      if (snapshot && snapshot.scene && Array.isArray(snapshot.turns)) {
+        applySessionHistoryPayload(snapshot, { source: "snapshot" });
+        return;
+      }
+    }
+    throw error;
+  }
 }
 
 async function continueSessionFromHistory(sessionId) {
@@ -1496,6 +1835,12 @@ async function continueSessionFromHistory(sessionId) {
 function showError(err) {
   const msg = String(err?.message || err);
   const mode = byId("authMode").value || "supabase";
+
+  if (isOfflineLikeError(err)) {
+    setNotice("当前离线或网络不可用，请恢复网络后重试。", "warning");
+    setOutput({ error: msg, hint: "离线状态下可先查看本地缓存内容。" });
+    return;
+  }
 
   if (msg.includes("invalid or expired access token") && mode === "supabase") {
     setNotice("Token 无效或过期，请重新登录获取。", "warning");
@@ -1528,9 +1873,23 @@ function bind() {
   syncOutcomeState();
   applyReflectionToForm(state.reflection);
   updateStepState();
+  initPwaRuntime().catch((err) => {
+    setPwaModeBadge("ERROR");
+    setPwaNetworkBar(`PWA 初始化失败: ${String(err?.message || err)}`, "offline");
+  });
 
   byId("templatePreset").addEventListener("change", applyTemplatePreset);
   byId("usedInRealWorld").addEventListener("change", syncOutcomeState);
+  byId("installAppBtn").addEventListener("click", () =>
+    promptPwaInstall()
+      .then(() => setNotice("安装流程已触发。", "success"))
+      .catch(showError)
+  );
+  byId("updateAppBtn").addEventListener("click", () =>
+    applyPwaUpdate()
+      .then(() => setNotice("正在更新到新版本。", "success"))
+      .catch(showError)
+  );
 
   byId("supabaseSignupBtn").addEventListener("click", () => signupSupabase().catch(showError));
   byId("supabaseLoginBtn").addEventListener("click", () => loginSupabase().catch(showError));
@@ -1689,6 +2048,22 @@ function bind() {
     byId("authMode").addEventListener("change", () => {
       setAuthMode(byId("authMode").value || "supabase");
     });
+    byId("enablePwaBtn").addEventListener("click", async () => {
+      await setPwaEnabled(true);
+      setNotice("已启用 PWA，页面将刷新。", "success");
+      window.location.reload();
+    });
+    byId("disablePwaBtn").addEventListener("click", async () => {
+      await setPwaEnabled(false);
+      await unregisterAllServiceWorkers();
+      setNotice("已禁用 PWA 并清理 Service Worker，页面将刷新。", "success");
+      window.location.reload();
+    });
+    byId("unregisterSwBtn").addEventListener("click", () =>
+      unregisterAllServiceWorkers()
+        .then((count) => setNotice(`已清理 ${count} 个 Service Worker 注册。`, "success"))
+        .catch(showError)
+    );
   }
 
   byId("useProxyBtn").addEventListener("click", () => {

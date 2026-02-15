@@ -166,6 +166,18 @@ python scripts/run_ofnr_eval.py --mode online
 RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
 
+### 5.6 PWA 冒烟检查
+
+```bash
+bash scripts/pwa_smoke_check.sh
+```
+
+检查项:
+
+1. `manifest.webmanifest` 字段完整性
+2. `sw.js` 语法检查
+3. 图标资源完整性（192/512）
+
 ## 6. GitHub Actions 手动预检
 
 工作流: `.github/workflows/release-preflight.yml`

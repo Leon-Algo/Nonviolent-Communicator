@@ -4,6 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NVC Practice Coach</title>
+    <meta name="theme-color" content="#1f7a64" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,6 +24,12 @@
         <p class="eyebrow">NVC Practice Coach</p>
         <h1>三步完成一次<br />非暴力沟通练习</h1>
         <p class="sub">登录账号，输入真实场景，获取可直接使用的改写和行动卡。</p>
+        <p class="pwa-meta">PWA 状态: <code id="pwaModeValue">初始化中</code></p>
+        <p id="pwaNetworkBar" class="pwa-network-bar is-hidden"></p>
+        <div class="actions pwa-top-actions">
+          <button id="installAppBtn" type="button" class="tone-ghost is-hidden">安装应用</button>
+          <button id="updateAppBtn" type="button" class="tone-ghost is-hidden">更新版本</button>
+        </div>
       </header>
 
       <ol class="stepper" aria-label="练习步骤">
@@ -344,6 +355,9 @@
           <button id="useMockModeBtn" type="button" class="tone-warm">切到 Mock</button>
           <button id="useSupabaseModeBtn" type="button" class="tone-ghost">切回 Supabase</button>
           <button id="useProxyBtn" type="button" class="tone-ghost">切换同域代理</button>
+          <button id="enablePwaBtn" type="button" class="tone-ghost">启用 PWA</button>
+          <button id="disablePwaBtn" type="button" class="tone-ghost">禁用 PWA</button>
+          <button id="unregisterSwBtn" type="button" class="tone-ghost">清理 SW</button>
         </div>
       </section>
 
