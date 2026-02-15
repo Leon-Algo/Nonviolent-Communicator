@@ -41,6 +41,9 @@
 2. 新增在线模型回归模式（`--mode online|both`，支持并发与超时控制）
 3. 预检脚本支持在线回归开关（`RUN_ONLINE_OFNR_EVAL=1`）
 4. 行动卡导出扩展：PDF（打印导出）、PNG 图片、分享模板（复制/导出）
+5. GitHub Actions 预检工作流新增在线回归灰度开关（`run_online_ofnr_eval`）
+6. 代码已推送主干（`62032f8`, `ee27b6c`）并完成 Vercel Preview 部署
+7. 阶段策略调整为 PWA-first（暂停微信小程序与原生 App 开发）
 
 ## 3. 关键问题与根因
 
@@ -63,6 +66,10 @@
    - RLS 隔离校验
    - Supabase JWT API 冒烟
 4. 当前阶段不做外接可观测性（日志平台/告警通道），仅保留内建 `/ops/metrics`。
+5. 在线模型回归采用灰度策略：
+   - 默认关闭
+   - 在有 `LLM_API_KEY` 且配额健康时手动开启
+6. 当前阶段仅推进 PWA，不启动小程序/安卓/iOS 的开发。
 
 ## 5. 验证结果
 
@@ -73,6 +80,7 @@
 3. `SKIP_REMOTE_API_SMOKE=1 SKIP_RLS_ISOLATION=1 bash scripts/release_preflight.sh` 通过
 4. OFNR 离线回归（`v0.2`）通过
 5. 在线回归模式脚本路径验证通过（`--mode online`，空 key 回退场景）
+6. `RUN_ONLINE_OFNR_EVAL` 联动脚本与 CI 开关逻辑验证通过
 
 云端验证:
 
@@ -81,6 +89,9 @@
 2. 该次预检已包含并通过:
    - RLS isolation check
    - Supabase JWT API smoke（含历史回看接口路径）
+3. 最新 Vercel Preview 部署:
+   - 后端: `https://nvc-practice-2a44rb1t5-lijianhzaumsgmailcoms-projects.vercel.app`
+   - 前端: `https://nvc-practice-84inglrln-lijianhzaumsgmailcoms-projects.vercel.app`
 
 ## 6. 当前状态结论
 
@@ -88,7 +99,7 @@
 
 ## 7. 下一阶段重点
 
-1. 会话历史回看细化（分组策略、检索效率与可解释性）
-2. 在线模型回归灰度接入发布流程（是否作为强门禁）
-3. 行动卡模板个性化（按对象角色自动生成分享模板）
-4. 复盘趋势可视化（周维度变化与阻碍聚合）
+1. PWA 基线能力（Manifest、SW 注册、缓存策略）
+2. PWA 离线与更新体验（离线提示、版本更新提示）
+3. PWA 验收与发布策略（测试清单、回滚开关、文档闭环）
+4. 小程序/原生 App 仅保留技术预研，不进入实现阶段

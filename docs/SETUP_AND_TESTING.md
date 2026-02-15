@@ -8,6 +8,11 @@
 2. 本地或线上 API 可用性验证
 3. 发布前预检
 
+当前阶段范围:
+
+1. 仅推进 Web/PWA
+2. 微信小程序与原生 App 暂不进入开发与测试范围
+
 当前生产地址:
 
 - 前端: `https://nvc-practice-web.vercel.app`
@@ -85,6 +90,15 @@ pytest tests -q
 7. 访问 `GET /ops/metrics`，确认可看到 `slow_request_count` 与 `server_error_count`
 8. 修改历史筛选条件并刷新页面，确认筛选条件会保留
 9. 历史列表测试上一页/下一页，确认分页生效
+
+### 4.4 PWA 验收（当前阶段重点）
+
+1. 打开 `Application` 面板确认 Manifest 生效（名称、图标、display）
+2. 触发安装入口，验证可成功安装到桌面（或应用列表）
+3. 断网后刷新页面，验证应用壳可打开
+4. 断网发送 API 请求，验证出现明确错误提示而非白屏
+5. 重新联网后验证可继续正常练习
+6. 发布新版本后验证出现更新提示并可切换到新版本
 
 ## 5. 冒烟与预检（仓库根目录）
 
@@ -165,12 +179,21 @@ RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-ap
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
+- `LLM_API_KEY`（仅在启用在线 OFNR 回归时需要）
+
+关键输入参数（`workflow_dispatch`）:
+
+1. `api_base_url`
+2. `run_rls_isolation`
+3. `run_remote_api_smoke`
+4. `run_online_ofnr_eval`（默认 `false`，灰度启用）
 
 当前仓库状态:
 
 - 已配置上述两个 Secrets，可直接运行完整线上预检。
 - 最近一次通过的完整预检（含 RLS + JWT API smoke）:
   - `https://github.com/Leon-Algo/Nonviolent-Communicator/actions/runs/21979380349`
+- 在线 OFNR 回归默认不在每次预检中强制执行，建议在发布前/每日固定时段手动开启。
 
 ## 7. 常见问题
 

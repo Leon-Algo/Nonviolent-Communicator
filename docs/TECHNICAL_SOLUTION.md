@@ -1,9 +1,9 @@
-# 技术方案（Python + Supabase + Vercel）
+# 技术方案（Python + Supabase + Vercel + PWA）
 
 ## 0. 文档信息
 
-- 版本: v1.0（整合版）
-- 更新日期: 2026-02-13
+- 版本: v1.2（整合版）
+- 更新日期: 2026-02-15
 - 范围: MVP 当前技术实现与约束
 
 ## 1. 方案结论
@@ -13,7 +13,7 @@
 3. 鉴权策略:
    - 线上: Supabase JWT
    - 本地开发: Mock Token（受开关控制）
-4. 部署: 前后端均部署 Vercel
+4. 部署: 前后端均部署 Vercel，前端进入 PWA 形态
 5. AI: ModelScope OpenAI-compatible API
 
 ## 2. 系统架构
@@ -89,7 +89,22 @@ flowchart LR
   - 前端 `https://nvc-practice-web.vercel.app`
   - 后端 `https://nvc-practice-api.vercel.app`
 
-### 7.2 关键环境变量
+### 7.2 PWA 设计（当前阶段）
+
+1. `manifest.webmanifest`
+   - `name`/`short_name`/`icons`/`theme_color`/`display=standalone`
+2. Service Worker
+   - 静态资源: `cache-first`
+   - API 请求: `network-first`
+3. 生命周期策略
+   - 缓存版本号管理
+   - 旧缓存清理
+4. 体验策略
+   - 安装入口（Install Prompt）
+   - 离线状态提示
+   - 新版本可更新提示
+
+### 7.3 关键环境变量
 
 - `APP_ENV`
 - `DATABASE_URL`
@@ -112,6 +127,11 @@ flowchart LR
 5. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
 6. 一键预检: `bash scripts/release_preflight.sh <api_url>`
 7. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
+8. PWA 手动验收:
+   - 可安装
+   - 离线可打开应用壳
+   - API 离线提示正常
+   - 更新提示可触发
 
 补充:
 
@@ -120,9 +140,11 @@ flowchart LR
 - 预检默认集成 OFNR 离线 eval 门禁（`overall` 与 `risk_accuracy` 阈值）
 - 可通过 `RUN_ONLINE_OFNR_EVAL=1` 启用在线模型回归（建议灰度启用）
 - 在线回归默认采样 `8` 条（`OFNR_ONLINE_EVAL_MAX_CASES`），避免配额与限流导致大面积失败
+- GitHub Actions `release-preflight` 已支持 `run_online_ofnr_eval` 手动参数
 
 ## 9. 当前技术边界
 
 1. 远端 API 冒烟依赖执行环境网络可达性
 2. 本地 DB 集成测试依赖 Docker/本地 Postgres 环境
 3. 可观测性已具备本地聚合能力，当前阶段不做外部日志平台与告警通道接入
+4. 微信小程序与安卓/iOS 原生 App 在当前阶段暂不开发
