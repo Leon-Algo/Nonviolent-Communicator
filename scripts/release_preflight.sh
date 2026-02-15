@@ -45,6 +45,7 @@ bash -n scripts/rls_isolation_check.sh
 bash -n scripts/supabase_jwt_api_smoke_test.sh
 bash -n scripts/release_preflight.sh
 bash -n scripts/pwa_smoke_check.sh
+bash -n scripts/vercel_release.sh
 
 step "pwa smoke checks"
 bash scripts/pwa_smoke_check.sh

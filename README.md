@@ -14,6 +14,7 @@ NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
 - 可观测性: 结构化请求日志 + `/ops/metrics` 慢请求/5xx 聚合
 - AI 回归: `spec/evals/ofnr_evalset_v0.2.jsonl` 离线回归（预检内置）+ 在线模型回归模式
 - 行动卡导出: 复制、Markdown、PDF（打印导出）、PNG 图片、分享模板（复制/导出）
+- PWA: 安装入口、更新提示、离线状态提示、历史会话离线快照
 
 ## 仓库结构
 
@@ -63,6 +64,15 @@ RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-ap
 
 说明: 在线回归依赖模型配额，若供应商返回 429（配额耗尽）会导致该步骤失败。
 
+5. 发布与回滚（仓库根目录）
+
+```bash
+bash scripts/vercel_release.sh preview all
+bash scripts/vercel_release.sh prod all
+# 回滚示例:
+bash scripts/vercel_release.sh rollback web <deployment_url_or_id>
+```
+
 ## 文档入口
 
 - 文档总览: `docs/README.md`
@@ -79,4 +89,4 @@ RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-ap
 生产地址:
 
 - 前端: `https://nvc-practice-web.vercel.app`
-- 后端: `https://nvc-practice-api.vercel.app`
+- 后端: `https://api.leonalgo.site`（备用: `https://nvc-practice-api.vercel.app`）

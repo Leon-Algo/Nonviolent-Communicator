@@ -47,6 +47,10 @@
 8. PWA 第一阶段完成（Manifest + SW + 离线提示 + 安装/更新入口）
 9. 历史会话离线快照能力落地（列表与单会话回看）
 10. 预检集成 PWA 冒烟脚本（`scripts/pwa_smoke_check.sh`）
+11. PWA 离线快照策略增强（会话上限/TTL/启动清理/手动清理入口）
+12. 发布与回滚流程脚本化（`scripts/vercel_release.sh`）
+13. 代码已推送主干（`ad8c6ef`, `073f554`）
+14. 最新前后端 Vercel Preview 已同步部署
 
 ## 3. 关键问题与根因
 
@@ -85,7 +89,8 @@
 5. 在线回归模式脚本路径验证通过（`--mode online`，空 key 回退场景）
 6. `RUN_ONLINE_OFNR_EVAL` 联动脚本与 CI 开关逻辑验证通过
 7. `bash scripts/pwa_smoke_check.sh` 通过
-8. 预检已包含 PWA 冒烟检查并通过
+8. `bash -n scripts/vercel_release.sh` 通过
+9. 预检已包含 PWA 冒烟检查并通过
 
 云端验证:
 
@@ -95,16 +100,16 @@
    - RLS isolation check
    - Supabase JWT API smoke（含历史回看接口路径）
 3. 最新 Vercel Preview 部署:
-   - 后端: `https://nvc-practice-2a44rb1t5-lijianhzaumsgmailcoms-projects.vercel.app`
-   - 前端: `https://nvc-practice-84inglrln-lijianhzaumsgmailcoms-projects.vercel.app`
+   - 后端: `https://nvc-practice-31gzc085u-lijianhzaumsgmailcoms-projects.vercel.app`
+   - 前端: `https://nvc-practice-guml6wo9e-lijianhzaumsgmailcoms-projects.vercel.app`
 
 ## 6. 当前状态结论
 
-项目已进入“可上线演示、可回归验证、具备基础安全隔离”的阶段，且 M3 核心可用性已落地。
+项目已进入“可上线演示、可回归验证、具备基础安全隔离”的阶段，且 M3（含 T11/T12）已收口完成。
 
 ## 7. 下一阶段重点
 
-1. PWA 发布与回滚策略收口（T11）
-2. 文档收口与验收记录同步（T12）
-3. 离线快照容量与清理策略优化
+1. PWA 离线能力深化（离线可读内容扩展）
+2. 发布流程自动化增强（预检 + 发布一体化）
+3. 在线 OFNR 回归灰度策略持续验证
 4. 小程序/原生 App 仅保留技术预研，不进入实现阶段

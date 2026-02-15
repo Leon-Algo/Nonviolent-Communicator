@@ -16,7 +16,7 @@
 当前生产地址:
 
 - 前端: `https://nvc-practice-web.vercel.app`
-- 后端: `https://nvc-practice-api.vercel.app`
+- 后端: `https://api.leonalgo.site`（备用: `https://nvc-practice-api.vercel.app`）
 
 ## 2. 环境准备
 
@@ -117,19 +117,19 @@ bash scripts/rls_isolation_check.sh
 ### 5.3 Supabase JWT API 冒烟
 
 ```bash
-bash scripts/supabase_jwt_api_smoke_test.sh https://nvc-practice-api.vercel.app
+bash scripts/supabase_jwt_api_smoke_test.sh https://api.leonalgo.site
 ```
 
 ### 5.4 一键发布前预检
 
 ```bash
-bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+bash scripts/release_preflight.sh https://api.leonalgo.site
 ```
 
 含集成测试时可执行：
 
 ```bash
-RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+RUN_DB_TESTS=1 bash scripts/release_preflight.sh https://api.leonalgo.site
 ```
 
 ### 5.5 OFNR 回归评测
@@ -163,10 +163,40 @@ python scripts/run_ofnr_eval.py --mode online
 发布前预检启用在线回归:
 
 ```bash
-RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://api.leonalgo.site
 ```
 
-### 5.6 PWA 冒烟检查
+### 5.6 Vercel 发布与回滚
+
+推荐统一使用发布脚本：
+
+1. Preview 发布（前后端）:
+
+```bash
+bash scripts/vercel_release.sh preview all
+```
+
+2. Production 发布（前后端）:
+
+```bash
+bash scripts/vercel_release.sh prod all
+```
+
+3. Production 回滚（按端执行）:
+
+```bash
+bash scripts/vercel_release.sh rollback web <deployment_url_or_id>
+bash scripts/vercel_release.sh rollback api <deployment_url_or_id>
+```
+
+4. 把指定部署晋升到当前生产（可选）:
+
+```bash
+bash scripts/vercel_release.sh promote web <deployment_url_or_id>
+bash scripts/vercel_release.sh promote api <deployment_url_or_id>
+```
+
+### 5.7 PWA 冒烟检查
 
 ```bash
 bash scripts/pwa_smoke_check.sh

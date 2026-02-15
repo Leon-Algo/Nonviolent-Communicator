@@ -2,7 +2,7 @@
 
 本文档用于管理当前项目的文档结构，目标是保持“少而清晰、单一事实来源”。
 
-更新时间: 2026-02-13
+更新时间: 2026-02-15
 
 ## 核心文档（仅保留这些）
 
@@ -22,6 +22,7 @@
 - API 契约: `spec/openapi/nvc-practice-coach.v1.yaml`
 - AI 回归样本: `spec/evals/ofnr_evalset_v0.2.jsonl`
 - AI 回归脚本: `scripts/run_ofnr_eval.py`
+- 发布回滚脚本: `scripts/vercel_release.sh`
 - 数据库迁移: `db/migrations/*.sql`
 
 ## 维护规则

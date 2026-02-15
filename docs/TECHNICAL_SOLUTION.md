@@ -87,7 +87,7 @@ flowchart LR
 - 前端项目指向 `web/`
 - 生产域名:
   - 前端 `https://nvc-practice-web.vercel.app`
-  - 后端 `https://nvc-practice-api.vercel.app`
+  - 后端 `https://api.leonalgo.site`（保留 `https://nvc-practice-api.vercel.app`）
 
 ### 7.2 PWA 设计（当前阶段）
 
@@ -105,10 +105,28 @@ flowchart LR
    - 新版本可更新提示
 5. 离线快照策略
    - 历史会话列表本地快照（默认最近 20 条）
-   - 单会话详情本地快照（按会话 id 存储）
+   - 单会话详情本地快照（按会话 id 存储，最多 30 个会话）
+   - 详情快照 TTL: 7 天，应用启动自动清理
+   - 提供开发态“清理离线快照”按钮，用于本地排障
    - 离线时优先回退到本地快照
 
-### 7.3 关键环境变量
+### 7.3 发布与回滚（收口）
+
+统一使用 `scripts/vercel_release.sh`：
+
+1. Preview 发布：`bash scripts/vercel_release.sh preview all`
+2. Production 发布：`bash scripts/vercel_release.sh prod all`
+3. Production 回滚：
+   - Web: `bash scripts/vercel_release.sh rollback web <deployment_url_or_id>`
+   - API: `bash scripts/vercel_release.sh rollback api <deployment_url_or_id>`
+
+说明:
+
+1. 脚本支持从根目录 `.env` 读取 `VERCEL_TOKEN`。
+2. 若不传 token，则复用本机 `vercel login` 会话。
+3. 回滚前建议先执行 `bash scripts/release_preflight.sh <api_url>`。
+
+### 7.4 关键环境变量
 
 - `APP_ENV`
 - `DATABASE_URL`
@@ -121,6 +139,7 @@ flowchart LR
 - `LLM_API_KEY`
 - `LLM_MODEL`
 - `OPENAI_BASE_URL`
+- `VERCEL_TOKEN`
 
 ## 8. 测试与预检
 
