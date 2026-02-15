@@ -18,6 +18,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_online_ofnr_eval:
+        description: "Run online OFNR regression (requires LLM_API_KEY secret and model quota)"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   preflight:
@@ -46,6 +51,7 @@ jobs:
       RUN_DB_TESTS: "1"
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,6 +112,16 @@ jobs:
             SKIP_REMOTE_API_SMOKE="1"
           fi
 
+          RUN_ONLINE_OFNR_EVAL="0"
+          if [[ "${{ inputs.run_online_ofnr_eval }}" == "true" ]]; then
+            if [[ -z "${LLM_API_KEY:-}" ]]; then
+              echo "LLM_API_KEY secret missing, skip online OFNR eval"
+            else
+              RUN_ONLINE_OFNR_EVAL="1"
+            fi
+          fi
+
           SKIP_RLS_ISOLATION="${SKIP_RLS_ISOLATION}" \
           SKIP_REMOTE_API_SMOKE="${SKIP_REMOTE_API_SMOKE}" \
+          RUN_ONLINE_OFNR_EVAL="${RUN_ONLINE_OFNR_EVAL}" \
           bash scripts/release_preflight.sh "${{ inputs.api_base_url }}"
