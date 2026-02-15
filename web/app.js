@@ -12,6 +12,9 @@ const PWA_DEFAULT_ENABLED = true;
 const HISTORY_LIST_SNAPSHOT_KEY = "history_list_snapshot_v1";
 const HISTORY_DETAIL_SNAPSHOT_PREFIX = "history_detail_snapshot_v1:";
 const HISTORY_SNAPSHOT_MAX_ITEMS = 20;
+const HISTORY_DETAIL_SNAPSHOT_INDEX_KEY = "history_detail_snapshot_index_v1";
+const HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS = 30;
+const HISTORY_SNAPSHOT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function resolvePwaEnabled() {
   const query = new URLSearchParams(window.location.search);
@@ -144,7 +147,11 @@ function persistHistoryListSnapshot(items, meta = {}) {
     offset: Number(meta.offset || 0),
     updated_at: new Date().toISOString(),
   };
-  localStorage.setItem(HISTORY_LIST_SNAPSHOT_KEY, JSON.stringify(payload));
+  try {
+    localStorage.setItem(HISTORY_LIST_SNAPSHOT_KEY, JSON.stringify(payload));
+  } catch {
+    // Snapshot write failure should not block core flow.
+  }
 }
 
 function loadHistoryListSnapshot() {
@@ -155,15 +162,150 @@ function loadHistoryListSnapshot() {
   return parsed;
 }
 
+function normalizeSnapshotTimestamp(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? "" : new Date(parsed).toISOString();
+}
+
+function loadHistoryDetailSnapshotIndex() {
+  const raw = localStorage.getItem(HISTORY_DETAIL_SNAPSHOT_INDEX_KEY);
+  if (!raw) return [];
+  const parsed = parseJson(raw, []);
+  if (!Array.isArray(parsed)) return [];
+  const normalized = parsed
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const sessionId = String(item.session_id || "").trim();
+      const savedAt = normalizeSnapshotTimestamp(item.saved_at);
+      if (!sessionId || !savedAt) return null;
+      return { session_id: sessionId, saved_at: savedAt };
+    })
+    .filter(Boolean);
+  return normalized;
+}
+
+function saveHistoryDetailSnapshotIndex(entries) {
+  try {
+    localStorage.setItem(HISTORY_DETAIL_SNAPSHOT_INDEX_KEY, JSON.stringify(entries));
+  } catch {
+    // ignore
+  }
+}
+
+function removeHistoryDetailSnapshotBySessionId(sessionId) {
+  if (!sessionId) return;
+  try {
+    localStorage.removeItem(`${HISTORY_DETAIL_SNAPSHOT_PREFIX}${sessionId}`);
+  } catch {
+    // ignore
+  }
+}
+
+function trimHistoryDetailSnapshotIndex(entries, options = {}) {
+  const { maxSessions = HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS, nowMs = Date.now() } = options;
+  const validEntries = entries
+    .filter((item) => {
+      const ts = Date.parse(item.saved_at);
+      if (Number.isNaN(ts)) return false;
+      return nowMs - ts <= HISTORY_SNAPSHOT_MAX_AGE_MS;
+    })
+    .sort((a, b) => Date.parse(b.saved_at) - Date.parse(a.saved_at));
+
+  if (validEntries.length <= maxSessions) return validEntries;
+  return validEntries.slice(0, maxSessions);
+}
+
+function pruneHistoryDetailSnapshots(options = {}) {
+  const {
+    maxSessions = HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS,
+    nowMs = Date.now(),
+    preserveSessionId = "",
+  } = options;
+  const currentEntries = loadHistoryDetailSnapshotIndex();
+  const dedupedMap = new Map();
+  currentEntries.forEach((item) => {
+    const previous = dedupedMap.get(item.session_id);
+    if (!previous || Date.parse(item.saved_at) > Date.parse(previous.saved_at)) {
+      dedupedMap.set(item.session_id, item);
+    }
+  });
+
+  let dedupedEntries = [...dedupedMap.values()];
+  const preserved = preserveSessionId
+    ? dedupedEntries.find((item) => item.session_id === preserveSessionId) || null
+    : null;
+  dedupedEntries = dedupedEntries.filter((item) => item.session_id !== preserveSessionId);
+  const trimmed = trimHistoryDetailSnapshotIndex(dedupedEntries, {
+    maxSessions: Math.max(0, maxSessions - (preserved ? 1 : 0)),
+    nowMs,
+  });
+  const nextEntries = preserved ? [preserved, ...trimmed] : trimmed;
+  const allowedSet = new Set(nextEntries.map((item) => item.session_id));
+  currentEntries.forEach((item) => {
+    if (!allowedSet.has(item.session_id)) {
+      removeHistoryDetailSnapshotBySessionId(item.session_id);
+    }
+  });
+  saveHistoryDetailSnapshotIndex(nextEntries);
+  return nextEntries;
+}
+
+function persistHistoryDetailSnapshotIndex(sessionId, savedAtIso) {
+  const entries = loadHistoryDetailSnapshotIndex().filter((item) => item.session_id !== sessionId);
+  entries.unshift({ session_id: sessionId, saved_at: savedAtIso });
+  saveHistoryDetailSnapshotIndex(entries);
+  pruneHistoryDetailSnapshots({
+    maxSessions: HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS,
+    preserveSessionId: sessionId,
+  });
+}
+
+function sanitizeHistoryDetailSnapshotPayload(payload) {
+  if (!payload || typeof payload !== "object") return null;
+  if (!payload.session_id || !payload.scene || !Array.isArray(payload.turns)) return null;
+  return {
+    session_id: payload.session_id,
+    scene: payload.scene,
+    state: payload.state,
+    current_turn: payload.current_turn,
+    target_turns: payload.target_turns,
+    created_at: payload.created_at,
+    ended_at: payload.ended_at,
+    turns: payload.turns,
+    summary: payload.summary || null,
+    reflection: payload.reflection || null,
+  };
+}
+
 function persistHistoryDetailSnapshot(sessionId, payload) {
   if (!sessionId || !payload || typeof payload !== "object") return;
-  localStorage.setItem(
-    `${HISTORY_DETAIL_SNAPSHOT_PREFIX}${sessionId}`,
-    JSON.stringify({
-      ...payload,
-      _snapshot_saved_at: new Date().toISOString(),
-    })
-  );
+  const sanitized = sanitizeHistoryDetailSnapshotPayload(payload);
+  if (!sanitized) return;
+  const savedAtIso = new Date().toISOString();
+  const storageKey = `${HISTORY_DETAIL_SNAPSHOT_PREFIX}${sessionId}`;
+  const snapshotPayload = {
+    ...sanitized,
+    _snapshot_saved_at: savedAtIso,
+  };
+  const jsonText = JSON.stringify(snapshotPayload);
+  try {
+    localStorage.setItem(storageKey, jsonText);
+    persistHistoryDetailSnapshotIndex(sessionId, savedAtIso);
+    return;
+  } catch {
+    pruneHistoryDetailSnapshots({
+      maxSessions: Math.max(1, Math.floor(HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS / 2)),
+      preserveSessionId: sessionId,
+    });
+    try {
+      localStorage.setItem(storageKey, jsonText);
+      persistHistoryDetailSnapshotIndex(sessionId, savedAtIso);
+    } catch {
+      // ignore quota failures
+    }
+  }
 }
 
 function loadHistoryDetailSnapshot(sessionId) {
@@ -173,6 +315,53 @@ function loadHistoryDetailSnapshot(sessionId) {
   const parsed = parseJson(raw, null);
   if (!parsed || typeof parsed !== "object") return null;
   return parsed;
+}
+
+function cleanupHistorySnapshots() {
+  const nowMs = Date.now();
+  const listSnapshot = loadHistoryListSnapshot();
+  if (listSnapshot?.updated_at) {
+    const updatedTs = Date.parse(listSnapshot.updated_at);
+    if (Number.isFinite(updatedTs) && nowMs - updatedTs > HISTORY_SNAPSHOT_MAX_AGE_MS) {
+      try {
+        localStorage.removeItem(HISTORY_LIST_SNAPSHOT_KEY);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  pruneHistoryDetailSnapshots({ nowMs, maxSessions: HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS });
+}
+
+function clearAllHistorySnapshots() {
+  try {
+    localStorage.removeItem(HISTORY_LIST_SNAPSHOT_KEY);
+  } catch {
+    // ignore
+  }
+  const snapshotKeys = [];
+  try {
+    for (let idx = 0; idx < localStorage.length; idx += 1) {
+      const key = localStorage.key(idx);
+      if (key && key.startsWith(HISTORY_DETAIL_SNAPSHOT_PREFIX)) {
+        snapshotKeys.push(key);
+      }
+    }
+  } catch {
+    // ignore
+  }
+  snapshotKeys.forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // ignore
+    }
+  });
+  try {
+    localStorage.removeItem(HISTORY_DETAIL_SNAPSHOT_INDEX_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function persistPwaEnabled(enabled) {
@@ -1861,6 +2050,7 @@ function showError(err) {
 function bind() {
   applyModeVisibility();
   loadConfig();
+  cleanupHistorySnapshots();
   hydrateRuntimeState();
   hydrateHistoryViewState();
   updateHistoryFilterHint(getHistoryFilters());
@@ -2064,6 +2254,10 @@ function bind() {
         .then((count) => setNotice(`已清理 ${count} 个 Service Worker 注册。`, "success"))
         .catch(showError)
     );
+    byId("clearOfflineSnapshotsBtn").addEventListener("click", () => {
+      clearAllHistorySnapshots();
+      setNotice("已清理本地离线快照。", "success");
+    });
   }
 
   byId("useProxyBtn").addEventListener("click", () => {
