@@ -430,6 +430,7 @@ function renderSummary() {
   byId("summaryMeta").textContent = summary?.created_at
     ? `生成时间: ${formatDateTime(summary.created_at)}`
     : "尚未生成";
+  updateShareTemplatePreview();
 }
 
 function renderReflectionMeta() {
@@ -500,6 +501,76 @@ function buildSummaryMarkdown() {
   ].join("\n");
 }
 
+function buildSummaryRiskLines(summary) {
+  if (!summary || !Array.isArray(summary.risk_triggers) || !summary.risk_triggers.length) {
+    return ["无"];
+  }
+  return summary.risk_triggers.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function buildSummaryShareTemplate(type = "peer") {
+  const summary = state.summary;
+  if (!summary) return "";
+  const riskLines = buildSummaryRiskLines(summary);
+  const riskLine = riskLines.length ? riskLines.join(" / ") : "无";
+  const createdAt = formatDateTime(summary.created_at);
+  const sceneTitle = byId("sceneTitle").value.trim() || "未命名场景";
+
+  if (type === "manager") {
+    return [
+      "【沟通对齐简报】",
+      `场景: ${sceneTitle}`,
+      `时间: ${createdAt}`,
+      "",
+      `观察: ${summary.opening_line || "-"}`,
+      `请求: ${summary.request_line || "-"}`,
+      `备选: ${summary.fallback_line || "-"}`,
+      `风险提醒: ${riskLine}`,
+      "",
+      "我会先按上面的开场句沟通，再根据现场反馈调整。",
+    ].join("\n");
+  }
+
+  if (type === "self") {
+    return [
+      "【今日 NVC 复盘卡】",
+      `场景: ${sceneTitle}`,
+      `时间: ${createdAt}`,
+      "",
+      `1) 开场句: ${summary.opening_line || "-"}`,
+      `2) 请求句: ${summary.request_line || "-"}`,
+      `3) 兜底句: ${summary.fallback_line || "-"}`,
+      `4) 风险提醒: ${riskLine}`,
+      "",
+      "明日执行检查: 是否先说观察事实，再表达感受与需要。"
+    ].join("\n");
+  }
+
+  return [
+    "【沟通准备卡】",
+    `场景: ${sceneTitle}`,
+    `时间: ${createdAt}`,
+    "",
+    `开场: ${summary.opening_line || "-"}`,
+    `请求: ${summary.request_line || "-"}`,
+    `兜底: ${summary.fallback_line || "-"}`,
+    `风险提醒: ${riskLine}`,
+    "",
+    "如果你方便，我们按这个版本先快速对齐。"
+  ].join("\n");
+}
+
+function updateShareTemplatePreview() {
+  const preview = byId("shareTemplatePreview");
+  if (!preview) return;
+  if (!state.summary) {
+    preview.value = "生成行动卡后，这里会出现可直接分享的文案模板。";
+    return;
+  }
+  const type = byId("shareTemplateType")?.value || "peer";
+  preview.value = buildSummaryShareTemplate(type);
+}
+
 async function copyText(text) {
   if (!navigator.clipboard || !window.isSecureContext) {
     const textarea = document.createElement("textarea");
@@ -516,8 +587,8 @@ async function copyText(text) {
   await navigator.clipboard.writeText(text);
 }
 
-function downloadText(filename, content) {
-  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+function downloadText(filename, content, mimeType = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mimeType });
   const href = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = href;
@@ -526,6 +597,206 @@ function downloadText(filename, content) {
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(href);
+}
+
+function downloadBlob(filename, blob) {
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(href);
+}
+
+function escapeForHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function escapeForXml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function splitTextForSvg(value, maxChars = 26, maxLines = 3) {
+  const source = String(value || "").replace(/\s+/g, " ").trim();
+  if (!source) return ["-"];
+  const lines = [];
+  let cursor = 0;
+  while (cursor < source.length && lines.length < maxLines) {
+    lines.push(source.slice(cursor, cursor + maxChars));
+    cursor += maxChars;
+  }
+  if (cursor < source.length && lines.length) {
+    const last = lines[lines.length - 1];
+    lines[lines.length - 1] = `${last.slice(0, Math.max(0, maxChars - 1))}…`;
+  }
+  return lines;
+}
+
+function buildSummaryPrintHtml() {
+  const summary = state.summary;
+  if (!summary) return "";
+  const riskItems = buildSummaryRiskLines(summary);
+  const sceneTitle = byId("sceneTitle").value.trim() || "未命名场景";
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>NVC 行动卡</title>
+    <style>
+      body { font-family: "Noto Sans SC", "PingFang SC", sans-serif; margin: 24px; color: #1c2d3a; }
+      h1 { margin: 0 0 10px; font-size: 24px; }
+      .meta { color: #496075; margin-bottom: 16px; font-size: 13px; }
+      .card { border: 2px solid #1f3548; padding: 14px; margin-top: 8px; }
+      .label { font-weight: 700; margin-bottom: 4px; color: #1f3548; }
+      .line { margin: 0 0 10px; line-height: 1.6; white-space: pre-wrap; }
+      ul { margin: 0; padding-left: 20px; }
+      li { line-height: 1.6; }
+    </style>
+  </head>
+  <body>
+    <h1>NVC 行动卡</h1>
+    <p class="meta">场景: ${escapeForHtml(sceneTitle)} | 生成时间: ${escapeForHtml(
+      formatDateTime(summary.created_at)
+    )}</p>
+    <section class="card">
+      <p class="label">开场句</p>
+      <p class="line">${escapeForHtml(summary.opening_line || "-")}</p>
+      <p class="label">请求句</p>
+      <p class="line">${escapeForHtml(summary.request_line || "-")}</p>
+      <p class="label">兜底句</p>
+      <p class="line">${escapeForHtml(summary.fallback_line || "-")}</p>
+      <p class="label">风险提醒</p>
+      <ul>${riskItems.map((item) => `<li>${escapeForHtml(item)}</li>`).join("")}</ul>
+    </section>
+  </body>
+</html>`;
+}
+
+function buildSummarySvg() {
+  const summary = state.summary;
+  if (!summary) return "";
+  const sceneTitle = byId("sceneTitle").value.trim() || "未命名场景";
+  const riskItems = buildSummaryRiskLines(summary);
+
+  const sections = [
+    { label: "开场句", value: summary.opening_line || "-" },
+    { label: "请求句", value: summary.request_line || "-" },
+    { label: "兜底句", value: summary.fallback_line || "-" },
+    { label: "风险提醒", value: riskItems.join(" / ") || "-" },
+  ];
+
+  const lines = [];
+  let y = 148;
+  sections.forEach((section) => {
+    lines.push(
+      `<text x="72" y="${y}" font-size="30" font-weight="700" fill="#173245">${escapeForXml(
+        section.label
+      )}</text>`
+    );
+    y += 48;
+    splitTextForSvg(section.value, 28, section.label === "风险提醒" ? 4 : 3).forEach((line) => {
+      lines.push(
+        `<text x="96" y="${y}" font-size="28" fill="#1f3548">${escapeForXml(line)}</text>`
+      );
+      y += 42;
+    });
+    y += 24;
+  });
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5f0dc"/>
+      <stop offset="100%" stop-color="#d9ecdf"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" fill="url(#cardBg)"/>
+  <rect x="34" y="34" width="1132" height="832" rx="24" fill="#ffffff" stroke="#1f3548" stroke-width="4"/>
+  <text x="72" y="92" font-size="44" font-weight="700" fill="#1f3548">NVC 行动卡</text>
+  <text x="72" y="126" font-size="22" fill="#436074">场景: ${escapeForXml(
+    sceneTitle
+  )} · 时间: ${escapeForXml(formatDateTime(summary.created_at))}</text>
+  ${lines.join("\n  ")}
+</svg>`;
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("图片渲染失败"));
+    img.src = url;
+  });
+}
+
+function exportSummaryAsPdf() {
+  if (!state.summary) {
+    throw new Error("请先生成行动卡");
+  }
+  const html = buildSummaryPrintHtml();
+  const popup = window.open("", "_blank", "noopener,noreferrer");
+  if (!popup) {
+    throw new Error("浏览器拦截了弹窗，请允许弹窗后重试");
+  }
+  popup.document.open();
+  popup.document.write(html);
+  popup.document.close();
+  popup.focus();
+  setTimeout(() => {
+    popup.print();
+  }, 180);
+}
+
+async function exportSummaryAsImage() {
+  if (!state.summary) {
+    throw new Error("请先生成行动卡");
+  }
+  const svg = buildSummarySvg();
+  const svgBlob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
+  const svgUrl = URL.createObjectURL(svgBlob);
+  try {
+    const image = await loadImage(svgUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 900;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("当前浏览器不支持图片导出");
+    }
+    context.fillStyle = "#f8f7f2";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    const pngBlob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("生成图片失败"));
+            return;
+          }
+          resolve(blob);
+        },
+        "image/png",
+        1
+      );
+    });
+    const filename = `nvc_action_card_${formatNowForFilename()}.png`;
+    downloadBlob(filename, pngBlob);
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
 }
 
 function setHighlightedText(element, content, keyword) {
@@ -1360,8 +1631,44 @@ function bind() {
       return;
     }
     const filename = `nvc_action_card_${formatNowForFilename()}.md`;
-    downloadText(filename, buildSummaryMarkdown());
+    downloadText(filename, buildSummaryMarkdown(), "text/markdown;charset=utf-8");
     setNotice("行动卡已导出为 Markdown。", "success");
+  });
+  byId("exportSummaryPdfBtn").addEventListener("click", () => {
+    try {
+      exportSummaryAsPdf();
+      setNotice("已打开打印窗口，可另存为 PDF。", "success");
+    } catch (error) {
+      showError(error);
+    }
+  });
+  byId("exportSummaryImageBtn").addEventListener("click", () =>
+    exportSummaryAsImage()
+      .then(() => setNotice("行动卡已导出为 PNG 图片。", "success"))
+      .catch(showError)
+  );
+  byId("shareTemplateType").addEventListener("change", updateShareTemplatePreview);
+  byId("copyShareTemplateBtn").addEventListener("click", async () => {
+    if (!state.summary) {
+      setNotice("请先生成行动卡。", "warning");
+      return;
+    }
+    try {
+      await copyText(buildSummaryShareTemplate(byId("shareTemplateType").value || "peer"));
+      setNotice("分享模板已复制。", "success");
+    } catch (error) {
+      showError(error);
+    }
+  });
+  byId("downloadShareTemplateBtn").addEventListener("click", () => {
+    if (!state.summary) {
+      setNotice("请先生成行动卡。", "warning");
+      return;
+    }
+    const templateType = byId("shareTemplateType").value || "peer";
+    const filename = `nvc_share_template_${templateType}_${formatNowForFilename()}.txt`;
+    downloadText(filename, buildSummaryShareTemplate(templateType), "text/plain;charset=utf-8");
+    setNotice("分享模板已导出。", "success");
   });
   byId("submitReflectionBtn").addEventListener("click", () => submitReflection().catch(showError));
   byId("weeklyProgressBtn").addEventListener("click", () => fetchWeeklyProgress().catch(showError));

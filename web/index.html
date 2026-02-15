@@ -241,6 +241,30 @@
             <div class="actions summary-actions">
               <button id="copySummaryBtn" type="button" class="tone-ghost">复制行动卡</button>
               <button id="exportSummaryBtn" type="button" class="tone-ghost">导出 Markdown</button>
+              <button id="exportSummaryPdfBtn" type="button" class="tone-ghost">导出 PDF</button>
+              <button id="exportSummaryImageBtn" type="button" class="tone-ghost">导出图片</button>
+            </div>
+            <div class="share-template-block">
+              <label class="inline-input">
+                分享模板
+                <select id="shareTemplateType">
+                  <option value="peer">发给同事</option>
+                  <option value="manager">发给上级</option>
+                  <option value="self">复盘记录</option>
+                </select>
+              </label>
+              <div class="actions summary-actions">
+                <button id="copyShareTemplateBtn" type="button" class="tone-ghost">复制模板</button>
+                <button id="downloadShareTemplateBtn" type="button" class="tone-ghost">
+                  导出模板
+                </button>
+              </div>
+              <textarea
+                id="shareTemplatePreview"
+                rows="5"
+                readonly
+                placeholder="生成行动卡后，这里会出现可直接分享的文案模板。"
+              ></textarea>
             </div>
           </article>
 

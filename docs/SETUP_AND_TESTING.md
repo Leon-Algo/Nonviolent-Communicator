@@ -76,7 +76,12 @@ pytest tests -q
 3. 点击“刷新历史”，确认能看到跨会话历史列表并可回看
 4. 在历史区测试筛选（状态/关键词/日期范围）并验证结果变化
 5. 加载历史会话后测试“跳到轮次”和“继续当前会话”交互
-6. 生成行动卡后测试“复制行动卡”和“导出 Markdown”按钮
+6. 生成行动卡后测试导出能力:
+   - 复制行动卡
+   - 导出 Markdown
+   - 导出 PDF（打印窗口）
+   - 导出图片（PNG）
+   - 分享模板（复制/导出）
 7. 访问 `GET /ops/metrics`，确认可看到 `slow_request_count` 与 `server_error_count`
 8. 修改历史筛选条件并刷新页面，确认筛选条件会保留
 9. 历史列表测试上一页/下一页，确认分页生效
@@ -123,6 +128,29 @@ python scripts/run_ofnr_eval.py
 
 - `OFNR_EVAL_MIN_OVERALL`（默认 `0.72`）
 - `OFNR_EVAL_MIN_RISK_ACCURACY`（默认 `0.75`）
+
+在线模型回归（可选）:
+
+```bash
+python scripts/run_ofnr_eval.py --mode online
+```
+
+在线回归门禁参数:
+
+- `OFNR_ONLINE_EVAL_MIN_OVERALL`（默认 `0.45`）
+- `OFNR_ONLINE_EVAL_MIN_SUCCESS`（默认 `0.6`）
+- `OFNR_ONLINE_EVAL_CONCURRENCY`（默认 `1`）
+- `OFNR_ONLINE_EVAL_MAX_CASES`（默认 `8`，`0` 表示全量）
+
+注意:
+
+- 在线回归依赖模型供应商可用额度；当日配额耗尽会触发 429，导致在线回归失败。
+
+发布前预检启用在线回归:
+
+```bash
+RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+```
 
 ## 6. GitHub Actions 手动预检
 

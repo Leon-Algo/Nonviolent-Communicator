@@ -8,6 +8,7 @@ API_BASE_URL="${1:-${API_BASE_URL:-https://nvc-practice-api.vercel.app}}"
 SKIP_REMOTE_API_SMOKE="${SKIP_REMOTE_API_SMOKE:-0}"
 SKIP_RLS_ISOLATION="${SKIP_RLS_ISOLATION:-0}"
 SKIP_OFNR_EVAL="${SKIP_OFNR_EVAL:-0}"
+RUN_ONLINE_OFNR_EVAL="${RUN_ONLINE_OFNR_EVAL:-0}"
 RUN_DB_TESTS="${RUN_DB_TESTS:-0}"
 
 step() {
@@ -48,8 +49,16 @@ if [[ "${SKIP_OFNR_EVAL}" == "1" ]]; then
   echo
   echo "[SKIP] OFNR eval skipped (SKIP_OFNR_EVAL=1)"
 else
-  step "OFNR eval regression"
-  python scripts/run_ofnr_eval.py
+  step "OFNR eval regression (offline)"
+  python scripts/run_ofnr_eval.py --mode offline
+
+  if [[ "${RUN_ONLINE_OFNR_EVAL}" == "1" ]]; then
+    step "OFNR eval regression (online)"
+    python scripts/run_ofnr_eval.py --mode online
+  else
+    echo
+    echo "[SKIP] online OFNR eval skipped (RUN_ONLINE_OFNR_EVAL!=1)"
+  fi
 fi
 
 if [[ "${SKIP_RLS_ISOLATION}" == "1" ]]; then

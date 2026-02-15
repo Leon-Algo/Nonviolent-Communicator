@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from dataclasses import dataclass
@@ -252,38 +253,60 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
         "Content-Type": "application/json",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            choices = data.get("choices") if isinstance(data, dict) else None
-            if not isinstance(choices, list) or not choices:
+    retry_statuses = {408, 409, 425, 429, 500, 502, 503, 504}
+    max_attempts = 3
+
+    for attempt in range(max_attempts):
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code in retry_statuses and attempt < max_attempts - 1:
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+
+                response.raise_for_status()
+                data = response.json()
+                choices = data.get("choices") if isinstance(data, dict) else None
+                if not isinstance(choices, list) or not choices:
+                    return None
+
+                message = choices[0].get("message") if isinstance(choices[0], dict) else None
+                content = message.get("content") if isinstance(message, dict) else None
+
+                if isinstance(content, str):
+                    normalized = content.strip()
+                    return normalized or None
+
+                if isinstance(content, list):
+                    text_parts = []
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            text_value = item.get("text")
+                            if isinstance(text_value, str):
+                                text_parts.append(text_value.strip())
+                    merged = " ".join(part for part in text_parts if part)
+                    return merged or None
+
                 return None
-
-            message = choices[0].get("message") if isinstance(choices[0], dict) else None
-            content = message.get("content") if isinstance(message, dict) else None
-
-            if isinstance(content, str):
-                normalized = content.strip()
-                return normalized or None
-
-            if isinstance(content, list):
-                text_parts = []
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        text_value = item.get("text")
-                        if isinstance(text_value, str):
-                            text_parts.append(text_value.strip())
-                merged = " ".join(part for part in text_parts if part)
-                return merged or None
-
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code if exc.response is not None else None
+            if status_code in retry_statuses and attempt < max_attempts - 1:
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
             return None
-    except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError, AttributeError, json.JSONDecodeError):
-        return None
+        except httpx.HTTPError:
+            if attempt < max_attempts - 1:
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
+            return None
+        except (KeyError, IndexError, ValueError, TypeError, AttributeError, json.JSONDecodeError):
+            return None
+    return None
 
 
-async def generate_assistant_reply(scene_context: str, user_message: str) -> str:
+async def generate_assistant_reply_online(
+    scene_context: str, user_message: str
+) -> str | None:
     system_prompt = (
         "你是职场沟通场景中的对话对方，请保持克制、真实、简洁。"
         "你要基于对方发言给出自然回应，并适度推动对齐下一步。"
@@ -294,28 +317,36 @@ async def generate_assistant_reply(scene_context: str, user_message: str) -> str
         f"用户发言: {user_message}\n"
         "请以对方身份回复。"
     )
-    llm_reply = await _call_openai_compatible(
+    return await _call_openai_compatible(
         [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         temperature=0.5,
         max_tokens=220,
     )
+
+
+async def generate_assistant_reply(scene_context: str, user_message: str) -> str:
+    llm_reply = await generate_assistant_reply_online(scene_context, user_message)
     if llm_reply:
         return llm_reply
 
     return "我理解你想推进这件事。为了更快达成一致，我们先对齐具体事实和你希望我配合的下一步，可以吗？"
 
 
-async def generate_rewrite(source_text: str) -> str:
+async def generate_rewrite_online(source_text: str) -> str | None:
     system_prompt = (
         "你是非暴力沟通教练。请将输入句子改写成 OFNR 风格：观察、感受、需要、请求。"
         "保持原意，不加入新事实，输出 1 句中文即可。"
     )
     user_prompt = f"原句: {source_text}"
-    llm_rewrite = await _call_openai_compatible(
+    return await _call_openai_compatible(
         [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}],
         temperature=0.2,
         max_tokens=200,
     )
+
+
+async def generate_rewrite(source_text: str) -> str:
+    llm_rewrite = await generate_rewrite_online(source_text)
     if llm_rewrite:
         return llm_rewrite
     return build_rewrite_sentence(source_text)

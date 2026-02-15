@@ -106,20 +106,23 @@ flowchart LR
 ## 8. 测试与预检
 
 1. 单测: `pytest backend/tests -q`
-2. OFNR 回归: `python scripts/run_ofnr_eval.py`
-3. RLS 校验: `bash scripts/rls_isolation_check.sh`
-4. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
-5. 一键预检: `bash scripts/release_preflight.sh <api_url>`
-6. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
+2. OFNR 离线回归: `python scripts/run_ofnr_eval.py --mode offline`
+3. OFNR 在线回归（可选）: `python scripts/run_ofnr_eval.py --mode online`
+4. RLS 校验: `bash scripts/rls_isolation_check.sh`
+5. Supabase JWT 冒烟: `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
+6. 一键预检: `bash scripts/release_preflight.sh <api_url>`
+7. GitHub Actions 手动预检: `.github/workflows/release-preflight.yml`
 
 补充:
 
 - 当前线上预检已包含历史回看接口校验（`GET /api/v1/sessions`、`GET /api/v1/sessions/{session_id}/history`）
 - 后端已提供最小可观测性端点 `GET /ops/metrics`（慢请求与 5xx 聚合）
-- 预检已集成 OFNR eval 门禁（`overall` 与 `risk_accuracy` 阈值）
+- 预检默认集成 OFNR 离线 eval 门禁（`overall` 与 `risk_accuracy` 阈值）
+- 可通过 `RUN_ONLINE_OFNR_EVAL=1` 启用在线模型回归（建议灰度启用）
+- 在线回归默认采样 `8` 条（`OFNR_ONLINE_EVAL_MAX_CASES`），避免配额与限流导致大面积失败
 
 ## 9. 当前技术边界
 
 1. 远端 API 冒烟依赖执行环境网络可达性
 2. 本地 DB 集成测试依赖 Docker/本地 Postgres 环境
-3. 可观测性已具备本地聚合能力，外部日志平台与告警通道仍待接入
+3. 可观测性已具备本地聚合能力，当前阶段不做外部日志平台与告警通道接入

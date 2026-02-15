@@ -477,6 +477,20 @@ mark {
   margin-top: 8px;
 }
 
+.share-template-block {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+#shareTemplatePreview {
+  min-height: 120px;
+  border: 2px solid var(--line);
+  background: #f3f8fc;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 pre {
   margin: 0;
   max-height: 300px;

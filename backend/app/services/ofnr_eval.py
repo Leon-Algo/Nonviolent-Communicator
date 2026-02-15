@@ -106,7 +106,7 @@ class EvalSummary:
         }
 
 
-def _load_jsonl(path: Path) -> list[dict]:
+def load_evalset_jsonl(path: Path) -> list[dict]:
     payloads: list[dict] = []
     for idx, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         normalized = line.strip()
@@ -125,7 +125,7 @@ def _load_jsonl(path: Path) -> list[dict]:
 
 
 def evaluate_evalset(evalset_path: Path) -> EvalSummary:
-    rows = _load_jsonl(evalset_path)
+    rows = load_evalset_jsonl(evalset_path)
     case_results: list[EvalCaseResult] = []
 
     risk_match_total = 0
@@ -253,4 +253,3 @@ def evaluate_evalset(evalset_path: Path) -> EvalSummary:
         failed_case_ids=failed_case_ids,
         case_results=case_results,
     )
-

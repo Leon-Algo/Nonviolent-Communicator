@@ -12,7 +12,8 @@ NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
 - 核心链路: 场景 -> 会话 -> 消息反馈 -> 改写/总结 -> 复盘 -> 周进度
 - 历史回看: 跨会话历史列表 + 单会话完整回看 + 分页/风险分组
 - 可观测性: 结构化请求日志 + `/ops/metrics` 慢请求/5xx 聚合
-- AI 回归: `spec/evals/ofnr_evalset_v0.1.jsonl` 自动回归（预检内置）
+- AI 回归: `spec/evals/ofnr_evalset_v0.2.jsonl` 离线回归（预检内置）+ 在线模型回归模式
+- 行动卡导出: 复制、Markdown、PDF（打印导出）、PNG 图片、分享模板（复制/导出）
 
 ## 仓库结构
 
@@ -53,6 +54,14 @@ pytest tests -q
 ```bash
 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
 ```
+
+可选: 执行在线模型回归（默认关闭）:
+
+```bash
+RUN_ONLINE_OFNR_EVAL=1 bash scripts/release_preflight.sh https://nvc-practice-api.vercel.app
+```
+
+说明: 在线回归依赖模型配额，若供应商返回 429（配额耗尽）会导致该步骤失败。
 
 ## 文档入口
 
