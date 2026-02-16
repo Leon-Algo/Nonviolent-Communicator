@@ -1,4 +1,4 @@
-const SW_VERSION = "v1";
+const SW_VERSION = "v2";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/",
