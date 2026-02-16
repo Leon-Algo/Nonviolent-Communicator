@@ -516,6 +516,7 @@ async function registerPwaServiceWorker() {
   const registration = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
   pwa.registration = registration;
   bindServiceWorkerUpdateEvents(registration);
+  registration.update().catch(() => {});
 }
 
 async function applyPwaUpdate() {
