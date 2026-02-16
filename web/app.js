@@ -117,6 +117,11 @@ function isDevContext() {
   );
 }
 
+function isEdgeAndroidBrowser() {
+  const ua = navigator.userAgent || "";
+  return ua.includes("EdgA/");
+}
+
 function ensureUserId() {
   const existing = localStorage.getItem("mock_user_id");
   if (existing) return existing;
@@ -419,7 +424,9 @@ function updatePwaActionButtons() {
   const installBtn = byId("installAppBtn");
   const updateBtn = byId("updateAppBtn");
   if (installBtn) {
-    const canInstall = pwa.enabled && Boolean(pwa.deferredInstallPrompt);
+    const canInstall =
+      pwa.enabled && (Boolean(pwa.deferredInstallPrompt) || isEdgeAndroidBrowser());
+    installBtn.textContent = isEdgeAndroidBrowser() ? "在 Edge 中添加到手机" : "安装应用";
     installBtn.classList.toggle("is-hidden", !canInstall);
   }
   if (updateBtn) {
@@ -528,6 +535,18 @@ async function applyPwaUpdate() {
 }
 
 async function promptPwaInstall() {
+  if (isEdgeAndroidBrowser()) {
+    setNotice(
+      "Edge 安卓会走“添加到手机”流程。请打开右上角菜单（...）并点击“添加到手机/安装应用”。",
+      "warning"
+    );
+    setOutput({
+      hint: "edge_android_install_flow",
+      action: "open_edge_menu_add_to_phone",
+    });
+    return;
+  }
+
   const prompt = pwa.deferredInstallPrompt;
   if (!prompt) {
     throw new Error("当前环境暂不支持安装提示");
