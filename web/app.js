@@ -15,6 +15,8 @@ const HISTORY_SNAPSHOT_MAX_ITEMS = 20;
 const HISTORY_DETAIL_SNAPSHOT_INDEX_KEY = "history_detail_snapshot_index_v1";
 const HISTORY_DETAIL_SNAPSHOT_MAX_SESSIONS = 30;
 const HISTORY_SNAPSHOT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const ONBOARDING_INSTALL_SKIP_KEY = "onboarding_install_skip_v1";
+const ONBOARDING_DISMISSED_KEY = "onboarding_dismiss_v1";
 
 function resolvePwaEnabled() {
   const query = new URLSearchParams(window.location.search);
@@ -69,6 +71,14 @@ const TEMPLATE_PRESETS = {
     power_dynamic: "PEER_LEVEL",
     pain_points: ["表达不够具体"],
   },
+};
+
+const MESSAGE_STARTERS = {
+  soft: "我观察到这个需求已经延期两次，我有点担心发布时间会继续受影响。你愿意和我一起把新的里程碑再对齐一次吗？",
+  direct:
+    "这个需求目前的延期已经影响发布节奏。我需要今天确认新的时间点和责任分工，方便我们现在一起确认吗？",
+  boundary:
+    "如果交付时间继续变化，我这边无法按原计划推进后续任务。我希望我们先明确稳定的交付边界，再继续下一步。",
 };
 
 const DEV_CONTEXT = isDevContext();
@@ -416,6 +426,7 @@ function updatePwaActionButtons() {
     const hasUpdate = pwa.enabled && pwa.updateReady;
     updateBtn.classList.toggle("is-hidden", !hasUpdate);
   }
+  refreshOnboardingJourney();
 }
 
 function refreshPwaModeBadge() {
@@ -591,6 +602,220 @@ function refreshAuthModeBadge() {
   byId("currentAuthMode").textContent = mode;
 }
 
+function isStandaloneDisplayMode() {
+  const matchesDisplayMode = window.matchMedia?.("(display-mode: standalone)").matches;
+  const matchesIosStandalone = window.navigator?.standalone === true;
+  return Boolean(matchesDisplayMode || matchesIosStandalone);
+}
+
+function getOnboardingState() {
+  const mode = byId("authMode")?.value || "supabase";
+  const authDone = mode === "mock" || Boolean(byId("supabaseAccessToken")?.value.trim());
+  const practiceDone = Boolean(state.sessionId && state.turn > 0);
+  const reviewDone = Boolean(state.summary);
+  const installSkipped = localStorage.getItem(ONBOARDING_INSTALL_SKIP_KEY) === "1";
+  const installSupported = "serviceWorker" in navigator;
+  const installDone = installSkipped || isStandaloneDisplayMode() || !installSupported;
+  return {
+    installDone,
+    installSkipped,
+    installSupported,
+    authDone,
+    practiceDone,
+    reviewDone,
+  };
+}
+
+function setJourneyPillState(element, { done = false, active = false } = {}) {
+  if (!element) return;
+  element.classList.toggle("is-done", done);
+  element.classList.toggle("is-active", active);
+}
+
+function getJourneyNextAction(snapshot) {
+  if (!snapshot.installDone) return "install";
+  if (!snapshot.authDone) return "auth";
+  if (!snapshot.practiceDone) return "practice";
+  if (!snapshot.reviewDone) return "review";
+  return "history";
+}
+
+function scrollToSection(sectionId, options = {}) {
+  const { focusId = "" } = options;
+  const section = byId(sectionId);
+  if (section) {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if (focusId) {
+    const focusEl = byId(focusId);
+    if (focusEl) {
+      window.setTimeout(() => {
+        focusEl.focus();
+      }, 220);
+    }
+  }
+}
+
+function updateActionAvailability() {
+  const hasSession = Boolean(state.sessionId);
+  const hasHistory = state.history.length > 0;
+  const hasSummary = Boolean(state.summary);
+  const mode = byId("authMode")?.value || "supabase";
+  const authDone = mode === "mock" || Boolean(byId("supabaseAccessToken")?.value.trim());
+
+  const sendMessageBtn = byId("sendMessageBtn");
+  const continuePracticeBtn = byId("continuePracticeBtn");
+  const generateSummaryBtn = byId("generateSummaryBtn");
+  const submitReflectionBtn = byId("submitReflectionBtn");
+  const gotoPracticeFromAuthBtn = byId("gotoPracticeFromAuthBtn");
+  const copySummaryBtn = byId("copySummaryBtn");
+  const exportSummaryBtn = byId("exportSummaryBtn");
+  const exportSummaryPdfBtn = byId("exportSummaryPdfBtn");
+  const exportSummaryImageBtn = byId("exportSummaryImageBtn");
+  const copyShareTemplateBtn = byId("copyShareTemplateBtn");
+  const downloadShareTemplateBtn = byId("downloadShareTemplateBtn");
+
+  if (sendMessageBtn) sendMessageBtn.disabled = !hasSession;
+  if (continuePracticeBtn) continuePracticeBtn.disabled = !hasSession;
+  if (generateSummaryBtn) generateSummaryBtn.disabled = !hasSession || !hasHistory;
+  if (submitReflectionBtn) submitReflectionBtn.disabled = !hasSession;
+  if (gotoPracticeFromAuthBtn) gotoPracticeFromAuthBtn.disabled = !authDone;
+  if (copySummaryBtn) copySummaryBtn.disabled = !hasSummary;
+  if (exportSummaryBtn) exportSummaryBtn.disabled = !hasSummary;
+  if (exportSummaryPdfBtn) exportSummaryPdfBtn.disabled = !hasSummary;
+  if (exportSummaryImageBtn) exportSummaryImageBtn.disabled = !hasSummary;
+  if (copyShareTemplateBtn) copyShareTemplateBtn.disabled = !hasSummary;
+  if (downloadShareTemplateBtn) downloadShareTemplateBtn.disabled = !hasSummary;
+}
+
+function refreshOnboardingJourney() {
+  const panel = byId("journeyPanel");
+  if (!panel) return;
+  const showBtn = byId("showJourneyBtn");
+  const dismissed = localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "1";
+
+  panel.classList.toggle("is-hidden", dismissed);
+  if (showBtn) {
+    showBtn.classList.toggle("is-hidden", !dismissed);
+  }
+  if (dismissed) return;
+
+  const snapshot = getOnboardingState();
+  const steps = [
+    snapshot.installDone,
+    snapshot.authDone,
+    snapshot.practiceDone,
+    snapshot.reviewDone,
+  ];
+  const doneCount = steps.filter(Boolean).length;
+  const progress = byId("journeyProgress");
+  if (progress) progress.textContent = `${doneCount}/4`;
+
+  setJourneyPillState(byId("journeyStepInstall"), {
+    done: snapshot.installDone,
+    active: !snapshot.installDone,
+  });
+  setJourneyPillState(byId("journeyStepAuth"), {
+    done: snapshot.authDone,
+    active: snapshot.installDone && !snapshot.authDone,
+  });
+  setJourneyPillState(byId("journeyStepPractice"), {
+    done: snapshot.practiceDone,
+    active: snapshot.installDone && snapshot.authDone && !snapshot.practiceDone,
+  });
+  setJourneyPillState(byId("journeyStepReview"), {
+    done: snapshot.reviewDone,
+    active:
+      snapshot.installDone &&
+      snapshot.authDone &&
+      snapshot.practiceDone &&
+      !snapshot.reviewDone,
+  });
+
+  const hint = byId("journeyHint");
+  const primaryBtn = byId("journeyPrimaryBtn");
+  const skipInstallBtn = byId("journeySkipInstallBtn");
+  const nextAction = getJourneyNextAction(snapshot);
+
+  if (skipInstallBtn) {
+    skipInstallBtn.disabled = snapshot.installDone;
+  }
+
+  if (!primaryBtn || !hint) return;
+
+  primaryBtn.dataset.action = nextAction;
+
+  if (nextAction === "install") {
+    if (pwa.deferredInstallPrompt) {
+      primaryBtn.textContent = "下一步：安装应用";
+      hint.textContent = "你可以先安装应用，后续进入更快；不安装也可继续使用。";
+    } else {
+      primaryBtn.textContent = "下一步：去注册登录";
+      hint.textContent = "当前环境未出现安装弹窗，你可以先跳过安装，直接注册登录。";
+      primaryBtn.dataset.action = "auth";
+    }
+    return;
+  }
+
+  if (nextAction === "auth") {
+    primaryBtn.textContent = "下一步：注册/登录";
+    hint.textContent = "填写邮箱和密码，点击登录并获取 Token。";
+    return;
+  }
+
+  if (nextAction === "practice") {
+    primaryBtn.textContent = "下一步：发送第 1 轮";
+    hint.textContent = "创建场景并发送第一句话，先拿到第一条结构化反馈。";
+    return;
+  }
+
+  if (nextAction === "review") {
+    primaryBtn.textContent = "下一步：生成行动卡";
+    hint.textContent = "行动卡会给出可直接用于真实对话的句子。";
+    return;
+  }
+
+  primaryBtn.textContent = "查看历史会话";
+  hint.textContent = "首轮流程已完成，你可以回看历史会话或继续新练习。";
+}
+
+async function handleJourneyPrimaryAction() {
+  const action = byId("journeyPrimaryBtn")?.dataset.action || "";
+
+  if (action === "install") {
+    await promptPwaInstall();
+    localStorage.removeItem(ONBOARDING_INSTALL_SKIP_KEY);
+    setNotice("安装流程已触发。", "success");
+    refreshOnboardingJourney();
+    return;
+  }
+
+  if (action === "auth") {
+    scrollToSection("authPanel", { focusId: "supabaseEmail" });
+    return;
+  }
+
+  if (action === "practice") {
+    scrollToSection("practicePanel", { focusId: "messageContent" });
+    return;
+  }
+
+  if (action === "review") {
+    scrollToSection("reviewPanel", { focusId: "generateSummaryBtn" });
+    return;
+  }
+
+  scrollToSection("historyPanel");
+}
+
+function applyMessageStarter(key) {
+  const starter = MESSAGE_STARTERS[key];
+  if (!starter) return;
+  byId("messageContent").value = starter;
+  byId("messageContent").focus();
+  setNotice("已填入示例开场句，可按你的真实场景继续改。", "success");
+}
+
 function setAuthMode(mode) {
   const normalized = mode === "mock" ? "mock" : "supabase";
   byId("authMode").value = normalized;
@@ -624,6 +849,9 @@ function updateStepState() {
   } else {
     stepReview.classList.add("is-active");
   }
+
+  updateActionAvailability();
+  refreshOnboardingJourney();
 }
 
 function updateRuntimeMeta() {
@@ -2069,6 +2297,9 @@ function bind() {
   });
 
   byId("templatePreset").addEventListener("change", applyTemplatePreset);
+  byId("starterSoftBtn").addEventListener("click", () => applyMessageStarter("soft"));
+  byId("starterDirectBtn").addEventListener("click", () => applyMessageStarter("direct"));
+  byId("starterBoundaryBtn").addEventListener("click", () => applyMessageStarter("boundary"));
   byId("usedInRealWorld").addEventListener("change", syncOutcomeState);
   byId("installAppBtn").addEventListener("click", () =>
     promptPwaInstall()
@@ -2083,6 +2314,32 @@ function bind() {
 
   byId("supabaseSignupBtn").addEventListener("click", () => signupSupabase().catch(showError));
   byId("supabaseLoginBtn").addEventListener("click", () => loginSupabase().catch(showError));
+  byId("gotoPracticeFromAuthBtn").addEventListener("click", () => {
+    const mode = byId("authMode").value || "supabase";
+    const authDone = mode === "mock" || Boolean(byId("supabaseAccessToken").value.trim());
+    if (!authDone) {
+      setNotice("请先完成登录。", "warning");
+      return;
+    }
+    scrollToSection("practicePanel", { focusId: "messageContent" });
+  });
+
+  byId("journeyPrimaryBtn").addEventListener("click", () =>
+    handleJourneyPrimaryAction().catch(showError)
+  );
+  byId("journeySkipInstallBtn").addEventListener("click", () => {
+    localStorage.setItem(ONBOARDING_INSTALL_SKIP_KEY, "1");
+    refreshOnboardingJourney();
+    setNotice("已跳过安装步骤，你可以先完成注册和首轮练习。", "success");
+  });
+  byId("dismissJourneyBtn").addEventListener("click", () => {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, "1");
+    refreshOnboardingJourney();
+  });
+  byId("showJourneyBtn").addEventListener("click", () => {
+    localStorage.removeItem(ONBOARDING_DISMISSED_KEY);
+    refreshOnboardingJourney();
+  });
 
   byId("clearTokenBtn").addEventListener("click", () => {
     byId("supabaseAccessToken").value = "";
@@ -2152,9 +2409,13 @@ function bind() {
   byId("startPracticeBtn").addEventListener("click", () =>
     sendPracticeTurn({ createFresh: true }).catch(showError)
   );
-  byId("sendMessageBtn").addEventListener("click", () =>
-    sendPracticeTurn({ createFresh: false }).catch(showError)
-  );
+  byId("sendMessageBtn").addEventListener("click", () => {
+    if (!state.sessionId) {
+      setNotice("请先点击“创建场景并发送第 1 轮”。", "warning");
+      return;
+    }
+    sendPracticeTurn({ createFresh: false }).catch(showError);
+  });
 
   byId("newSessionBtn").addEventListener("click", () => {
     resetRuntimeState();
@@ -2281,6 +2542,9 @@ function bind() {
     renderHistoryPagination(0, getBoundedHistoryLimit(byId("historyLimit").value), 0);
     renderSessionHistoryList([]);
   }
+
+  updateActionAvailability();
+  refreshOnboardingJourney();
 }
 
 bind();

@@ -23,12 +23,14 @@
       <header class="hero">
         <p class="eyebrow">NVC Practice Coach</p>
         <h1>三步完成一次<br />非暴力沟通练习</h1>
-        <p class="sub">登录账号，输入真实场景，获取可直接使用的改写和行动卡。</p>
+        <p class="sub">第一次使用建议按“安装（可选）-> 注册登录 -> 对练 -> 行动卡”顺序完成。</p>
+        <p class="hero-note">首次体验通常 3-5 分钟可完成。</p>
         <p class="pwa-meta">PWA 状态: <code id="pwaModeValue">初始化中</code></p>
         <p id="pwaNetworkBar" class="pwa-network-bar is-hidden"></p>
         <div class="actions pwa-top-actions">
           <button id="installAppBtn" type="button" class="tone-ghost is-hidden">安装应用</button>
           <button id="updateAppBtn" type="button" class="tone-ghost is-hidden">更新版本</button>
+          <button id="showJourneyBtn" type="button" class="tone-ghost is-hidden">显示新手引导</button>
         </div>
       </header>
 
@@ -56,12 +58,33 @@
         </li>
       </ol>
 
-      <section class="panel">
+      <section id="journeyPanel" class="panel journey-panel">
         <div class="panel-title-row">
-          <h2>Step 1. 登录账号</h2>
+          <h2>新手引导（首轮）</h2>
+          <p class="badge"><code id="journeyProgress">0/4</code></p>
+        </div>
+        <p id="journeyHint" class="meta">
+          先完成注册登录，再发送第 1 轮消息。安装应用是可选项，可以先跳过。
+        </p>
+        <div class="journey-track">
+          <span id="journeyStepInstall" class="journey-pill">1. 安装（可选）</span>
+          <span id="journeyStepAuth" class="journey-pill">2. 注册/登录</span>
+          <span id="journeyStepPractice" class="journey-pill">3. 发送第 1 轮</span>
+          <span id="journeyStepReview" class="journey-pill">4. 生成行动卡</span>
+        </div>
+        <div class="actions">
+          <button id="journeyPrimaryBtn" type="button">下一步</button>
+          <button id="journeySkipInstallBtn" type="button" class="tone-ghost">安装先跳过</button>
+          <button id="dismissJourneyBtn" type="button" class="tone-ghost">隐藏引导</button>
+        </div>
+      </section>
+
+      <section id="authPanel" class="panel">
+        <div class="panel-title-row">
+          <h2>Step 1. 注册 / 登录</h2>
           <p class="badge">当前模式: <code id="currentAuthMode">supabase</code></p>
         </div>
-        <p class="meta">线上只使用 Supabase 鉴权。注册后可直接登录获取 token。</p>
+        <p class="meta">新用户先注册，老用户直接登录即可。</p>
 
         <div class="grid two">
           <label>
@@ -74,22 +97,33 @@
           </label>
         </div>
 
-        <label>
-          Access Token
-          <input id="supabaseAccessToken" type="text" placeholder="登录后自动填充" />
-        </label>
-
         <div class="actions">
           <button id="supabaseSignupBtn" type="button" class="tone-warm">注册</button>
           <button id="supabaseLoginBtn" type="button">登录并获取 Token</button>
           <button id="clearTokenBtn" type="button" class="tone-ghost">退出登录</button>
-          <button id="saveConfigBtn" type="button" class="tone-ghost">保存配置</button>
+        </div>
+
+        <details class="advanced-block">
+          <summary>高级设置（一般不用改）</summary>
+          <label>
+            Access Token
+            <input id="supabaseAccessToken" type="text" placeholder="登录后自动填充" />
+          </label>
+          <div class="actions">
+            <button id="saveConfigBtn" type="button" class="tone-ghost">保存高级配置</button>
+          </div>
+        </details>
+
+        <div class="actions">
+          <button id="gotoPracticeFromAuthBtn" type="button" class="tone-ghost">
+            已登录，去开始对练
+          </button>
         </div>
 
         <p id="noticeBar" class="notice is-hidden"></p>
       </section>
 
-      <section class="panel">
+      <section id="practicePanel" class="panel">
         <div class="panel-title-row">
           <h2>Step 2. 开始对练</h2>
           <div class="runtime-meta">
@@ -135,10 +169,16 @@
           你的发言
           <textarea id="messageContent" rows="3">你们总是拖延，根本不专业。</textarea>
         </label>
+        <p class="meta compact-meta">不会开场时可先用“我观察到...我感到...我希望...”句式。</p>
+        <div class="actions message-starter-row">
+          <button id="starterSoftBtn" type="button" class="tone-ghost">和缓开场</button>
+          <button id="starterDirectBtn" type="button" class="tone-ghost">直接表达</button>
+          <button id="starterBoundaryBtn" type="button" class="tone-ghost">边界表达</button>
+        </div>
 
         <div class="actions">
           <button id="startPracticeBtn" type="button">创建场景并发送第 1 轮</button>
-          <button id="sendMessageBtn" type="button">继续下一轮</button>
+          <button id="sendMessageBtn" type="button">发送下一轮（第 2 轮起）</button>
           <button id="newSessionBtn" type="button" class="tone-ghost">重置并开始新会话</button>
         </div>
       </section>
@@ -188,7 +228,7 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section id="historyPanel" class="panel">
         <div class="panel-title-row">
           <h2>历史会话列表（跨会话回看）</h2>
           <div class="actions">
@@ -234,7 +274,7 @@
         </div>
       </section>
 
-      <section class="panel">
+      <section id="reviewPanel" class="panel">
         <h2>Step 3. 总结与复盘</h2>
         <div class="actions">
           <button id="generateSummaryBtn" type="button">生成行动卡</button>
@@ -362,8 +402,8 @@
         </div>
       </section>
 
-      <section class="panel">
-        <h2>调试输出</h2>
+      <section class="panel" data-dev-only>
+        <h2>调试输出（仅本地 dev）</h2>
         <pre id="output">{}</pre>
       </section>
     </main>

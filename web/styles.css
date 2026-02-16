@@ -71,6 +71,12 @@ h1 {
   max-width: 56ch;
 }
 
+.hero-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .pwa-meta {
   margin: 10px 0 0;
   color: var(--muted);
@@ -155,6 +161,10 @@ h1 {
   animation: rise 0.55s ease both;
 }
 
+.journey-panel {
+  border-style: dashed;
+}
+
 .panel-title-row {
   display: flex;
   justify-content: space-between;
@@ -183,6 +193,10 @@ h3 {
   margin: 0 0 10px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.compact-meta {
+  margin: 8px 0 0;
 }
 
 .runtime-meta {
@@ -236,6 +250,33 @@ select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.journey-track {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.journey-pill {
+  border: 2px solid var(--line);
+  padding: 6px 10px;
+  background: #f1f4f8;
+  font-size: 12px;
+  font-weight: 700;
+  color: #354756;
+}
+
+.journey-pill.is-active {
+  background: #fff2de;
+  border-color: #9a5a00;
+  color: #6e3d00;
+}
+
+.journey-pill.is-done {
+  background: #e8f8ef;
+  border-color: var(--ok);
+  color: var(--ok);
 }
 
 .inline-input {
@@ -293,6 +334,12 @@ button {
 
 button:hover {
   filter: brightness(0.96);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
 }
 
 button.tone-warm {
@@ -501,6 +548,29 @@ mark {
 
 .summary-actions {
   margin-top: 8px;
+}
+
+.advanced-block {
+  margin-top: 10px;
+  border: 2px dashed #9ab0c4;
+  background: #f6fbff;
+  padding: 8px 10px;
+}
+
+.advanced-block summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #355068;
+}
+
+.advanced-block label {
+  margin-top: 8px;
+}
+
+.message-starter-row button {
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .share-template-block {
