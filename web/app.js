@@ -474,6 +474,7 @@ function bindPwaRuntimeSignals() {
   window.addEventListener("appinstalled", () => {
     pwa.deferredInstallPrompt = null;
     updatePwaActionButtons();
+    closeInstallGuide();
     setNotice("应用已安装，可从桌面直接打开。", "success");
   });
 
@@ -487,9 +488,40 @@ function markPwaUpdateReady() {
   setPwaNetworkBar("检测到新版本，可点击“更新版本”完成切换。", "online");
 }
 
-function showInstallGuidance(message) {
+function openInstallGuide(options = {}) {
+  const {
+    title = "安装到手机",
+    subtitle = "当前浏览器不会直接弹出安装框，请按以下步骤操作。",
+    steps = [],
+  } = options;
+  const overlay = byId("installGuideOverlay");
+  const titleEl = byId("installGuideTitle");
+  const subtitleEl = byId("installGuideSubtitle");
+  const stepsEl = byId("installGuideSteps");
+  if (!overlay || !titleEl || !subtitleEl || !stepsEl) return;
+
+  titleEl.textContent = title;
+  subtitleEl.textContent = subtitle;
+  stepsEl.innerHTML = "";
+  const normalizedSteps = Array.isArray(steps) ? steps.filter(Boolean) : [];
+  normalizedSteps.forEach((stepText) => {
+    const item = document.createElement("li");
+    item.textContent = String(stepText);
+    stepsEl.appendChild(item);
+  });
+  overlay.classList.remove("is-hidden");
+}
+
+function closeInstallGuide() {
+  const overlay = byId("installGuideOverlay");
+  if (!overlay) return;
+  overlay.classList.add("is-hidden");
+}
+
+function showInstallGuidance(message, options = {}) {
   const text = String(message || "").trim();
   if (!text) return;
+  openInstallGuide(options);
   setPwaNetworkBar(text, "offline");
   setNotice(text, "warning");
 }
@@ -545,7 +577,17 @@ async function applyPwaUpdate() {
 async function promptPwaInstall() {
   if (isEdgeAndroidBrowser()) {
     showInstallGuidance(
-      "Edge 安卓会走“添加到手机”流程。请打开右上角菜单（...）并点击“添加到手机/安装应用”。"
+      "Edge 安卓会走“添加到手机”流程。请打开右上角菜单（...）并点击“添加到手机/安装应用”。",
+      {
+        title: "在 Edge 中添加到手机",
+        subtitle: "Edge Android 不一定弹系统安装窗，需要手动从菜单添加。",
+        steps: [
+          "点击右上角菜单（...）。",
+          "选择“添加到手机”或“安装应用”。",
+          "在系统弹窗点击“安装/添加”。",
+          "安装后回到桌面查看 NVC 图标。",
+        ],
+      }
     );
     setOutput({
       hint: "edge_android_install_flow",
@@ -556,7 +598,15 @@ async function promptPwaInstall() {
 
   const prompt = pwa.deferredInstallPrompt;
   if (!prompt) {
-    showInstallGuidance("当前环境未出现安装弹窗，请从浏览器菜单选择“添加到主屏幕/安装应用”。");
+    showInstallGuidance("当前环境未出现安装弹窗，请从浏览器菜单选择“添加到主屏幕/安装应用”。", {
+      title: "手动添加到主屏幕",
+      subtitle: "不同浏览器安装入口名称可能不同。",
+      steps: [
+        "打开浏览器菜单。",
+        "选择“添加到主屏幕”或“安装应用”。",
+        "确认添加后，返回桌面查看图标。",
+      ],
+    });
     setOutput({
       hint: "install_prompt_unavailable",
       action: "open_browser_menu_add_to_home",
@@ -2389,6 +2439,14 @@ function bind() {
   byId("showJourneyBtn").addEventListener("click", () => {
     localStorage.removeItem(ONBOARDING_DISMISSED_KEY);
     refreshOnboardingJourney();
+  });
+  byId("closeInstallGuideBtn").addEventListener("click", () => {
+    closeInstallGuide();
+  });
+  byId("installGuideOverlay").addEventListener("click", (event) => {
+    if (event.target === byId("installGuideOverlay")) {
+      closeInstallGuide();
+    }
   });
 
   byId("clearTokenBtn").addEventListener("click", () => {

@@ -8,6 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -19,6 +21,22 @@
   </head>
   <body>
     <div class="grain"></div>
+    <div id="installGuideOverlay" class="install-guide-overlay is-hidden">
+      <section class="install-guide-card" role="dialog" aria-modal="true" aria-label="安装应用引导">
+        <div class="install-guide-head">
+          <h3 id="installGuideTitle">安装到手机</h3>
+          <button id="closeInstallGuideBtn" type="button" class="tone-ghost">关闭</button>
+        </div>
+        <p id="installGuideSubtitle" class="meta compact-meta">
+          当前浏览器不会直接弹出安装框，请按以下步骤操作。
+        </p>
+        <ol id="installGuideSteps" class="install-guide-steps">
+          <li>点击浏览器右上角菜单（...）。</li>
+          <li>选择“添加到手机”或“安装应用”。</li>
+          <li>在系统弹窗中点击“安装/添加”。</li>
+        </ol>
+      </section>
+    </div>
     <main class="shell">
       <header class="hero">
         <p class="eyebrow">NVC Practice Coach</p>

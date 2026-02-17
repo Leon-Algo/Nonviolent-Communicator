@@ -603,6 +603,48 @@ pre {
   display: none !important;
 }
 
+.install-guide-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 25, 34, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  padding: 14px;
+}
+
+.install-guide-card {
+  width: min(540px, 92vw);
+  border: 2px solid var(--line);
+  background: #fffdf8;
+  box-shadow: 8px 8px 0 rgba(18, 34, 47, 0.58);
+  padding: 14px;
+}
+
+.install-guide-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.install-guide-head h3 {
+  margin: 0;
+}
+
+.install-guide-head button {
+  padding: 6px 10px;
+}
+
+.install-guide-steps {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
 @keyframes rise {
   from {
     transform: translateY(8px);
@@ -631,5 +673,10 @@ pre {
   .panel-title-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .install-guide-card {
+    width: 100%;
+    box-shadow: 5px 5px 0 rgba(18, 34, 47, 0.58);
   }
 }
