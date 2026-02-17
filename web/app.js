@@ -487,6 +487,13 @@ function markPwaUpdateReady() {
   setPwaNetworkBar("检测到新版本，可点击“更新版本”完成切换。", "online");
 }
 
+function showInstallGuidance(message) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  setPwaNetworkBar(text, "offline");
+  setNotice(text, "warning");
+}
+
 function bindServiceWorkerUpdateEvents(registration) {
   if (!registration) return;
   if (registration.waiting) {
@@ -537,24 +544,34 @@ async function applyPwaUpdate() {
 
 async function promptPwaInstall() {
   if (isEdgeAndroidBrowser()) {
-    setNotice(
-      "Edge 安卓会走“添加到手机”流程。请打开右上角菜单（...）并点击“添加到手机/安装应用”。",
-      "warning"
+    showInstallGuidance(
+      "Edge 安卓会走“添加到手机”流程。请打开右上角菜单（...）并点击“添加到手机/安装应用”。"
     );
     setOutput({
       hint: "edge_android_install_flow",
       action: "open_edge_menu_add_to_phone",
     });
-    return;
+    return { triggered: false, mode: "edge_manual" };
   }
 
   const prompt = pwa.deferredInstallPrompt;
   if (!prompt) {
-    throw new Error("当前环境暂不支持安装提示");
+    showInstallGuidance("当前环境未出现安装弹窗，请从浏览器菜单选择“添加到主屏幕/安装应用”。");
+    setOutput({
+      hint: "install_prompt_unavailable",
+      action: "open_browser_menu_add_to_home",
+    });
+    return { triggered: false, mode: "manual" };
   }
   await prompt.prompt();
+  const choice = await prompt.userChoice.catch(() => null);
   pwa.deferredInstallPrompt = null;
   updatePwaActionButtons();
+  return {
+    triggered: true,
+    mode: "prompt",
+    outcome: choice?.outcome || "unknown",
+  };
 }
 
 async function setPwaEnabled(enabled) {
@@ -803,9 +820,15 @@ async function handleJourneyPrimaryAction() {
   const action = byId("journeyPrimaryBtn")?.dataset.action || "";
 
   if (action === "install") {
-    await promptPwaInstall();
-    localStorage.removeItem(ONBOARDING_INSTALL_SKIP_KEY);
-    setNotice("安装流程已触发。", "success");
+    const result = await promptPwaInstall();
+    if (result?.triggered) {
+      localStorage.removeItem(ONBOARDING_INSTALL_SKIP_KEY);
+      if (result.outcome === "dismissed") {
+        setNotice("你已取消安装，可稍后再次点击安装。", "warning");
+      } else {
+        setNotice("安装流程已触发。", "success");
+      }
+    }
     refreshOnboardingJourney();
     return;
   }
@@ -2323,7 +2346,14 @@ function bind() {
   byId("usedInRealWorld").addEventListener("change", syncOutcomeState);
   byId("installAppBtn").addEventListener("click", () =>
     promptPwaInstall()
-      .then(() => setNotice("安装流程已触发。", "success"))
+      .then((result) => {
+        if (!result?.triggered) return;
+        if (result.outcome === "dismissed") {
+          setNotice("你已取消安装，可稍后再次点击安装。", "warning");
+          return;
+        }
+        setNotice("安装流程已触发。", "success");
+      })
       .catch(showError)
   );
   byId("updateAppBtn").addEventListener("click", () =>
