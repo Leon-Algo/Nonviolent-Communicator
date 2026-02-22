@@ -1,4 +1,4 @@
-const SW_VERSION = "v4";
+const SW_VERSION = "v5";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/",
@@ -85,7 +85,9 @@ self.addEventListener("activate", (event) => {
         (key) => key.startsWith("nvc-static-") && key !== STATIC_CACHE_NAME
       );
       await Promise.all(staleKeys.map((key) => caches.delete(key)));
-      await self.clients.claim();
+      // Do not claim existing clients immediately in this migration version.
+      // This avoids forcing an automatic controller switch + reload loop
+      // for users still running older app.js runtime logic.
     })()
   );
 });
