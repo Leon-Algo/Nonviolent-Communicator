@@ -1,4 +1,4 @@
-const SW_VERSION = "v5";
+const SW_VERSION = "v6";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/",
@@ -26,29 +26,23 @@ function isStaticCandidate(request, url) {
 }
 
 async function cacheFirst(request) {
-  const cache = await caches.open(STATIC_CACHE_NAME);
   const cacheKey = request.mode === "navigate" ? "/index.html" : request;
-  const cached = await cache.match(cacheKey, { ignoreSearch: request.mode === "navigate" });
+
+  const cached = await matchStaticCache(cacheKey, { ignoreSearch: request.mode === "navigate" });
   if (cached) {
     return cached;
   }
 
   try {
     const response = await fetch(request);
-    if (response && response.ok) {
-      await cache.put(cacheKey, response.clone());
-    }
+    await putStaticCache(cacheKey, response);
     return response;
   } catch {
     if (request.mode === "navigate") {
-      const fallback = await cache.match("/index.html");
+      const fallback = await matchStaticCache("/index.html");
       if (fallback) return fallback;
     }
-    return new Response("offline", {
-      status: 503,
-      statusText: "Service Unavailable",
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    return buildOfflineTextResponse();
   }
 }
 
@@ -56,23 +50,72 @@ async function networkFirstApi(request) {
   try {
     return await fetch(request);
   } catch {
-    return new Response(
-      JSON.stringify({
-        error_code: "OFFLINE",
-        message: "当前离线，无法访问服务端接口。",
-      }),
-      {
-        status: 503,
-        statusText: "Service Unavailable",
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-      }
-    );
+    return buildOfflineApiResponse();
   }
+}
+
+async function openStaticCache() {
+  try {
+    return await caches.open(STATIC_CACHE_NAME);
+  } catch {
+    return null;
+  }
+}
+
+async function matchStaticCache(cacheKey, options = {}) {
+  const cache = await openStaticCache();
+  if (!cache) return null;
+  try {
+    return await cache.match(cacheKey, options);
+  } catch {
+    return null;
+  }
+}
+
+async function putStaticCache(cacheKey, response) {
+  if (!response || !response.ok) return;
+  const cache = await openStaticCache();
+  if (!cache) return;
+  try {
+    await cache.put(cacheKey, response.clone());
+  } catch {
+    // Ignore cache write failures and keep serving network response.
+  }
+}
+
+function buildOfflineTextResponse() {
+  return new Response("offline", {
+    status: 503,
+    statusText: "Service Unavailable",
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+function buildOfflineApiResponse() {
+  return new Response(
+    JSON.stringify({
+      error_code: "OFFLINE",
+      message: "当前离线，无法访问服务端接口。",
+    }),
+    {
+      status: 503,
+      statusText: "Service Unavailable",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    }
+  );
 }
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE_NAME).then((cache) => cache.addAll(SHELL_CACHE_FILES))
+    (async () => {
+      const cache = await openStaticCache();
+      if (!cache) return;
+      try {
+        await cache.addAll(SHELL_CACHE_FILES);
+      } catch {
+        // Keep install successful even if a subset of static files cannot be cached.
+      }
+    })()
   );
   self.skipWaiting();
 });
@@ -80,7 +123,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      const keys = await caches.keys();
+      const keys = await caches.keys().catch(() => []);
       const staleKeys = keys.filter(
         (key) => key.startsWith("nvc-static-") && key !== STATIC_CACHE_NAME
       );
@@ -108,6 +151,8 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isStaticCandidate(request, url)) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(
+      cacheFirst(request).catch(() => fetch(request).catch(() => buildOfflineTextResponse()))
+    );
   }
 });
