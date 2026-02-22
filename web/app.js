@@ -424,9 +424,16 @@ function updatePwaActionButtons() {
   const installBtn = byId("installAppBtn");
   const updateBtn = byId("updateAppBtn");
   if (installBtn) {
-    const canInstall =
-      pwa.enabled && (Boolean(pwa.deferredInstallPrompt) || isEdgeAndroidBrowser());
-    installBtn.textContent = isEdgeAndroidBrowser() ? "在 Edge 中添加到手机" : "安装应用";
+    const hasPrompt = Boolean(pwa.deferredInstallPrompt);
+    const edgeAndroid = isEdgeAndroidBrowser();
+    const canInstall = pwa.enabled && !isStandaloneDisplayMode();
+    if (edgeAndroid) {
+      installBtn.textContent = "在 Edge 中添加到手机";
+    } else if (hasPrompt) {
+      installBtn.textContent = "安装应用";
+    } else {
+      installBtn.textContent = "添加到手机";
+    }
     installBtn.classList.toggle("is-hidden", !canInstall);
   }
   if (updateBtn) {
