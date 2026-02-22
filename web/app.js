@@ -4,6 +4,7 @@ function byId(id) {
 
 const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
+const DEFAULT_API_BASE_URL = "https://api.leonalgo.site";
 const RUNTIME_STATE_KEY = "runtime_state_v2";
 const HISTORY_VIEW_STATE_KEY = "history_view_state_v1";
 const HISTORY_DEFAULT_LIMIT = 10;
@@ -120,6 +121,10 @@ function isDevContext() {
 function isEdgeAndroidBrowser() {
   const ua = navigator.userAgent || "";
   return ua.includes("EdgA/");
+}
+
+function resolveDefaultApiBaseUrl() {
+  return DEV_CONTEXT ? window.location.origin : DEFAULT_API_BASE_URL;
 }
 
 function ensureUserId() {
@@ -1016,7 +1021,7 @@ function resetRuntimeState() {
 
 function getConfig(options = {}) {
   const { requireAuthToken = true, requireMockUser = true } = options;
-  const apiBaseUrl = normalizeApiBaseUrl(byId("apiBaseUrl").value || window.location.origin);
+  const apiBaseUrl = normalizeApiBaseUrl(byId("apiBaseUrl").value || resolveDefaultApiBaseUrl());
   const authMode = DEV_CONTEXT ? byId("authMode").value || "supabase" : "supabase";
   const userId = byId("mockUserId").value.trim();
 
@@ -1955,16 +1960,16 @@ function saveConfig() {
 }
 
 function loadConfig() {
-  const savedApiRaw = localStorage.getItem("api_base_url");
-  const shouldForceProxy =
-    !savedApiRaw || /nvc-practice-api\.vercel\.app|api\.leonalgo\.site/.test(savedApiRaw);
-  const savedApi = shouldForceProxy ? window.location.origin : savedApiRaw;
+  const defaultApiBase = resolveDefaultApiBaseUrl();
+  const savedApiRaw = normalizeApiBaseUrl(localStorage.getItem("api_base_url") || "");
+  const isSameOriginApi = savedApiRaw === window.location.origin;
+  const shouldMigrateLegacyProxy = !DEV_CONTEXT && (!savedApiRaw || isSameOriginApi);
+  const resolvedApi = shouldMigrateLegacyProxy ? defaultApiBase : savedApiRaw || defaultApiBase;
 
-  if (shouldForceProxy) {
-    localStorage.setItem("api_base_url", window.location.origin);
+  byId("apiBaseUrl").value = resolvedApi;
+  if (resolvedApi !== savedApiRaw) {
+    localStorage.setItem("api_base_url", resolvedApi);
   }
-
-  byId("apiBaseUrl").value = savedApi || window.location.origin;
   byId("mockUserId").value = localStorage.getItem("mock_user_id") || ensureUserId();
   byId("supabaseUrl").value = localStorage.getItem("supabase_url") || DEFAULT_SUPABASE_URL;
   byId("supabaseAnonKey").value =
@@ -2639,7 +2644,7 @@ function bind() {
   byId("useProxyBtn").addEventListener("click", () => {
     byId("apiBaseUrl").value = window.location.origin;
     localStorage.setItem("api_base_url", window.location.origin);
-    setNotice("已切换为同域代理。", "success");
+    setNotice("已切换为同域代理（仅调试场景建议使用）。", "success");
   });
 
   if (!state.history.length) {

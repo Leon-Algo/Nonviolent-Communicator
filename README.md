@@ -6,7 +6,7 @@ NVC (Nonviolent Communication) 练习产品的 MVP 项目仓库。
 ## 当前能力
 
 - 后端: FastAPI + PostgreSQL（Supabase）
-- 前端: 引导式 3 步练习页（Vercel）
+- 前端: 引导式 3 步练习页（当前 Vercel，迁移目标 Cloudflare Pages）
 - 鉴权: Supabase JWT（线上）+ Mock（本地开发）
 - AI: ModelScope OpenAI-compatible 接口
 - 核心链路: 场景 -> 会话 -> 消息反馈 -> 改写/总结 -> 复盘 -> 周进度
@@ -73,6 +73,12 @@ bash scripts/vercel_release.sh prod all
 bash scripts/vercel_release.sh rollback web <deployment_url_or_id>
 ```
 
+Cloudflare Pages（方案 A）发布:
+
+```bash
+bash scripts/cloudflare_pages_release.sh deploy <cf_pages_project_name>
+```
+
 ## 文档入口
 
 - 文档总览: `docs/README.md`
@@ -84,7 +90,17 @@ bash scripts/vercel_release.sh rollback web <deployment_url_or_id>
 
 ## 部署说明
 
-前后端均可部署在 Vercel；GitHub Actions 用于自动化测试/预检，不替代 Vercel 的托管能力。
+当前生产基线:
+
+1. 前后端均在 Vercel
+2. GitHub Actions 用于自动化测试/预检，不替代托管平台
+
+迁移计划（M4）:
+
+1. 方案 A（优先）: Cloudflare Pages 前端 + Vercel 后端
+2. 方案 B（条件触发）: Cloudflare Pages 前端 + Render 后端
+
+迁移实施细节见: `docs/TECHNICAL_SOLUTION.md`、`docs/DEVELOPMENT_PLAN.md`、`docs/SETUP_AND_TESTING.md`
 
 生产地址:
 

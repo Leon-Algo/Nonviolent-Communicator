@@ -2,16 +2,16 @@
 
 本文档用于管理当前项目的文档结构，目标是保持“少而清晰、单一事实来源”。
 
-更新时间: 2026-02-22
+更新时间: 2026-02-22（迁移方案更新）
 
 ## 核心文档（仅保留这些）
 
 1. `docs/PRD.md`
    - 产品目标、范围、用户流程、验收标准
 2. `docs/TECHNICAL_SOLUTION.md`
-   - 技术架构、鉴权策略、数据库策略、部署策略
+   - 技术架构、鉴权策略、数据库策略、部署策略（含 Cloudflare/Render 迁移设计）
 3. `docs/DEVELOPMENT_PLAN.md`
-   - 里程碑、优先级、当前待开发事项
+   - 里程碑、优先级、当前待开发事项（含 A/B 迁移执行计划）
 4. `docs/SETUP_AND_TESTING.md`
    - 本地/线上配置、迁移执行、冒烟和预检步骤
 5. `docs/STAGE_REVIEW.md`
@@ -23,6 +23,7 @@
 - AI 回归样本: `spec/evals/ofnr_evalset_v0.2.jsonl`
 - AI 回归脚本: `scripts/run_ofnr_eval.py`
 - 发布回滚脚本: `scripts/vercel_release.sh`
+- Cloudflare 前端发布脚本: `scripts/cloudflare_pages_release.sh`
 - 数据库迁移: `db/migrations/*.sql`
 
 ## 维护规则

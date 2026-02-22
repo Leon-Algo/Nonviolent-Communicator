@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     )
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
     cors_origin_regex: str = Field(
-        default=r"https://.*\.vercel\.app", alias="CORS_ORIGIN_REGEX"
+        default=r"https://.*\.(vercel\.app|pages\.dev)", alias="CORS_ORIGIN_REGEX"
     )
 
     model_config = SettingsConfigDict(
