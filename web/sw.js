@@ -1,8 +1,6 @@
-const SW_VERSION = "v6";
+const SW_VERSION = "v7";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
-  "/",
-  "/index.html",
   "/styles.css",
   "/app.js",
   "/manifest.webmanifest",
@@ -21,12 +19,12 @@ function isStaticCandidate(request, url) {
   if (request.method !== "GET") return false;
   if (url.origin !== self.location.origin) return false;
   if (isApiRequest(url)) return false;
-  if (request.mode === "navigate") return true;
+  if (request.mode === "navigate") return false;
   return ["script", "style", "image", "font"].includes(request.destination);
 }
 
 async function cacheFirst(request) {
-  const cacheKey = request.mode === "navigate" ? "/index.html" : request;
+  const cacheKey = request;
 
   const cached = await matchStaticCache(cacheKey, { ignoreSearch: request.mode === "navigate" });
   if (cached) {
@@ -38,10 +36,6 @@ async function cacheFirst(request) {
     await putStaticCache(cacheKey, response);
     return response;
   } catch {
-    if (request.mode === "navigate") {
-      const fallback = await matchStaticCache("/index.html");
-      if (fallback) return fallback;
-    }
     return buildOfflineTextResponse();
   }
 }

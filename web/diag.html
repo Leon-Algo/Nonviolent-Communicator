@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NVC Network Diag</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f8fb;
+        color: #13232d;
+      }
+      main {
+        max-width: 720px;
+        margin: 48px auto;
+        padding: 24px;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 6px 24px rgba(16, 38, 54, 0.08);
+      }
+      code {
+        background: #eff4f8;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Cloudflare Pages 诊断页</h1>
+      <p>如果你能看到此页面，说明当前域名静态分发链路是可达的。</p>
+      <p>Build: <code>v2026-02-22-diag-1</code></p>
+      <p id="ua"></p>
+      <script>
+        document.getElementById("ua").textContent = "UA: " + navigator.userAgent;
+      </script>
+    </main>
+  </body>
+</html>
