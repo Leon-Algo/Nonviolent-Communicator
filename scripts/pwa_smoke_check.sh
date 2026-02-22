@@ -7,8 +7,11 @@ cd "${ROOT_DIR}"
 required_files=(
   "web/manifest.webmanifest"
   "web/sw.js"
+  "web/icons/favicon-32.png"
   "web/icons/icon-192.png"
   "web/icons/icon-512.png"
+  "web/icons/icon-maskable-192.png"
+  "web/icons/icon-maskable-512.png"
 )
 
 for path in "${required_files[@]}"; do
@@ -36,13 +39,22 @@ if manifest["display"] != "standalone":
     raise SystemExit("[FAIL] manifest display must be standalone")
 
 icons = manifest.get("icons", [])
-if not isinstance(icons, list) or len(icons) < 2:
-    raise SystemExit("[FAIL] manifest icons must contain at least 2 entries")
+if not isinstance(icons, list) or len(icons) < 4:
+    raise SystemExit("[FAIL] manifest icons must contain at least 4 entries")
 
 sizes = {item.get("sizes", "") for item in icons if isinstance(item, dict)}
 for expected in {"192x192", "512x512"}:
     if expected not in sizes:
         raise SystemExit(f"[FAIL] manifest icons missing size: {expected}")
+
+maskable_sizes = {
+    item.get("sizes", "")
+    for item in icons
+    if isinstance(item, dict) and "maskable" in str(item.get("purpose", ""))
+}
+for expected in {"192x192", "512x512"}:
+    if expected not in maskable_sizes:
+        raise SystemExit(f"[FAIL] manifest maskable icons missing size: {expected}")
 
 print("[PASS] manifest validation")
 PY

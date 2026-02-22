@@ -3,7 +3,7 @@
 ## 0. 文档信息
 
 - 版本: v1.2（整合版）
-- 更新日期: 2026-02-15
+- 更新日期: 2026-02-22
 - 范围: MVP 当前技术实现与约束
 
 ## 1. 方案结论
@@ -100,15 +100,24 @@ flowchart LR
    - 缓存版本号管理
    - 旧缓存清理
 4. 体验策略
-   - 安装入口（Install Prompt）
+   - 安装入口（未安装状态下持续可见）
    - 离线状态提示
    - 新版本可更新提示
+   - 安装引导弹层（手动安装步骤提示）
+   - 浏览器兼容分流（Edge Android 与非 Edge 区分文案）
 5. 离线快照策略
    - 历史会话列表本地快照（默认最近 20 条）
    - 单会话详情本地快照（按会话 id 存储，最多 30 个会话）
    - 详情快照 TTL: 7 天，应用启动自动清理
    - 提供开发态“清理离线快照”按钮，用于本地排障
    - 离线时优先回退到本地快照
+6. 图标策略
+   - `any` 图标: `icon-192.png`, `icon-512.png`
+   - `maskable` 图标: `icon-maskable-192.png`, `icon-maskable-512.png`
+   - 浏览器 favicon: `favicon-32.png`
+7. SW 更新策略
+   - 缓存版本滚动（强制替换旧缓存）
+   - `registerPwaServiceWorker` 后主动 `registration.update()` 降低客户端滞后
 
 ### 7.3 发布与回滚（收口）
 
@@ -125,6 +134,7 @@ flowchart LR
 1. 脚本支持从根目录 `.env` 读取 `VERCEL_TOKEN`。
 2. 若不传 token，则复用本机 `vercel login` 会话。
 3. 回滚前建议先执行 `bash scripts/release_preflight.sh <api_url>`。
+4. PWA 前端变更建议同步发布到 Production，以避免 Preview 与用户实际访问版本不一致。
 
 ### 7.4 关键环境变量
 
