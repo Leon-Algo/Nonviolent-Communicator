@@ -90,6 +90,7 @@ const pwa = {
   updateReady: false,
   networkBarTimer: null,
   isReloadingForUpdate: false,
+  shouldReloadOnControllerChange: false,
 };
 
 const state = {
@@ -583,6 +584,7 @@ async function applyPwaUpdate() {
     updatePwaActionButtons();
     return;
   }
+  pwa.shouldReloadOnControllerChange = true;
   pwa.registration.waiting.postMessage({ type: "SKIP_WAITING" });
 }
 
@@ -660,7 +662,7 @@ async function initPwaRuntime() {
 
   await registerPwaServiceWorker();
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (pwa.isReloadingForUpdate) return;
+    if (pwa.isReloadingForUpdate || !pwa.shouldReloadOnControllerChange) return;
     pwa.isReloadingForUpdate = true;
     window.location.reload();
   });
