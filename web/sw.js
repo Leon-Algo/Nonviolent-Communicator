@@ -1,4 +1,4 @@
-const SW_VERSION = "v8";
+const SW_VERSION = "v9";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/styles.css",
@@ -40,14 +40,6 @@ async function cacheFirst(request) {
   }
 }
 
-async function networkFirstApi(request) {
-  try {
-    return await fetch(request);
-  } catch {
-    return buildOfflineApiResponse();
-  }
-}
-
 async function openStaticCache() {
   try {
     return await caches.open(STATIC_CACHE_NAME);
@@ -83,20 +75,6 @@ function buildOfflineTextResponse() {
     statusText: "Service Unavailable",
     headers: { "Content-Type": "text/plain; charset=utf-8" },
   });
-}
-
-function buildOfflineApiResponse() {
-  return new Response(
-    JSON.stringify({
-      error_code: "OFFLINE",
-      message: "当前离线，无法访问服务端接口。",
-    }),
-    {
-      status: 503,
-      statusText: "Service Unavailable",
-      headers: { "Content-Type": "application/json; charset=utf-8" },
-    }
-  );
 }
 
 self.addEventListener("install", (event) => {
@@ -138,11 +116,6 @@ self.addEventListener("message", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-
-  if (isApiRequest(url)) {
-    event.respondWith(networkFirstApi(request));
-    return;
-  }
 
   if (isStaticCandidate(request, url)) {
     event.respondWith(

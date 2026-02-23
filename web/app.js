@@ -1969,11 +1969,7 @@ function saveConfig() {
 function loadConfig() {
   const defaultApiBase = resolveDefaultApiBaseUrl();
   const savedApiRaw = normalizeApiBaseUrl(localStorage.getItem("api_base_url") || "");
-  const isSameOriginApi = savedApiRaw === window.location.origin;
-  const isLegacyRemoteApi = LEGACY_REMOTE_API_BASE_URLS.has(savedApiRaw);
-  const shouldMigrateLegacyProxy =
-    !DEV_CONTEXT && (!savedApiRaw || isSameOriginApi || isLegacyRemoteApi);
-  const resolvedApi = shouldMigrateLegacyProxy ? defaultApiBase : savedApiRaw || defaultApiBase;
+  const resolvedApi = DEV_CONTEXT ? savedApiRaw || defaultApiBase : defaultApiBase;
 
   byId("apiBaseUrl").value = resolvedApi;
   if (resolvedApi !== savedApiRaw) {
