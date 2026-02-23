@@ -1,8 +1,7 @@
-const SW_VERSION = "v9";
+const SW_VERSION = "v10";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/styles.css",
-  "/app.js",
   "/manifest.webmanifest",
   "/icons/favicon-32.png",
   "/icons/icon-192.png",
@@ -20,7 +19,7 @@ function isStaticCandidate(request, url) {
   if (url.origin !== self.location.origin) return false;
   if (isApiRequest(url)) return false;
   if (request.mode === "navigate") return false;
-  return ["script", "style", "image", "font"].includes(request.destination);
+  return ["style", "image", "font"].includes(request.destination);
 }
 
 async function cacheFirst(request) {
