@@ -2,8 +2,8 @@
 
 ## 1. 复盘范围
 
-- 时间范围: 2026-02-11 至 2026-02-22
-- 覆盖阶段: 从 MVP 首版联调到安全基线、回归闭环、M3 PWA 上线与安装体验优化
+- 时间范围: 2026-02-11 至 2026-02-23
+- 覆盖阶段: 从 MVP 首版联调到 Cloudflare 迁移稳定化
 
 ## 2. 时间线摘要
 
@@ -38,114 +38,123 @@
 关键进展:
 
 1. OFNR 评测集扩展到 `v0.2`（30 样本）
-2. 新增在线模型回归模式（`--mode online|both`，支持并发与超时控制）
-3. 预检脚本支持在线回归开关（`RUN_ONLINE_OFNR_EVAL=1`）
-4. 行动卡导出扩展：PDF（打印导出）、PNG 图片、分享模板（复制/导出）
-5. GitHub Actions 预检工作流新增在线回归灰度开关（`run_online_ofnr_eval`）
-6. 代码已推送主干（`62032f8`, `ee27b6c`）并完成 Vercel Preview 部署
-7. 阶段策略调整为 PWA-first（暂停微信小程序与原生 App 开发）
-8. PWA 第一阶段完成（Manifest + SW + 离线提示 + 安装/更新入口）
-9. 历史会话离线快照能力落地（列表与单会话回看）
-10. 预检集成 PWA 冒烟脚本（`scripts/pwa_smoke_check.sh`）
-11. PWA 离线快照策略增强（会话上限/TTL/启动清理/手动清理入口）
-12. 发布与回滚流程脚本化（`scripts/vercel_release.sh`）
-13. 代码已推送主干（`ad8c6ef`, `073f554`）
-14. 最新前后端 Vercel Preview 已同步部署
+2. 新增在线模型回归模式（`--mode online|both`）
+3. 行动卡导出扩展（PDF/PNG/分享模板）
+4. PWA 第一阶段落地（安装入口、更新提示、离线提示）
+5. 历史会话离线快照能力落地
 
 ### 2026-02-22
 
 关键进展:
 
-1. 新手引导 UX 落地（首轮任务条、下一步导航、常用开场句快捷填充）
-2. 安卓 Edge 安装兼容优化（避免误导提示，改为菜单安装引导）
-3. 修复“取消安装后入口消失”问题（安装入口在未安装状态下持续可见）
-4. PWA 图标体系升级（`any + maskable + favicon`），桌面图标可识别
-5. 安装提示升级为可关闭弹层（分步骤文案，手机端可见性增强）
-6. Service Worker 版本升级并强化更新检查（降低旧缓存导致的“无变化”概率）
-7. 多次生产发布同步完成，前端生产域名已切换到最新构建
-8. 完成“非 Vercel 迁移”调研，形成两条低成本候选路径：
-   - 方案 A: Cloudflare 前端 + 现有 Vercel 后端
-   - 方案 B: Cloudflare 前端 + Render 后端
-9. 迁移实施文档已收口到核心文档（技术方案/开发计划/部署测试）
-10. 迁移基础改造已完成：
-   - 前端默认 API 改为 `https://api.leonalgo.site`（不再强制同域）
-   - 后端 CORS 默认兼容 `pages.dev`
-   - 新增 Cloudflare Pages 发布脚本（`scripts/cloudflare_pages_release.sh`）
+1. 新手引导 UX 落地
+2. 安卓 Edge 安装兼容优化
+3. 修复“取消安装后入口消失”
+4. 图标体系升级（`any + maskable + favicon`）
+5. Service Worker 更新策略增强
+6. Cloudflare 迁移基础改造启动（前端发布脚本、CORS 扩展）
 
-## 3. 关键问题与根因
+### 2026-02-23（本次重点）
 
-1. 前端 `Failed to fetch`
-   - 根因: 跨域配置与历史本地配置混用，导致请求目标不稳定。
-2. 消息接口 500
-   - 根因: DB 连接策略与 SQL 参数处理在特定链路下不稳定。
-3. Supabase 注册 429
-   - 根因: Auth 邮件发送频控触发。
-4. 云端预检早期失败（Event loop is closed）
-   - 根因: `APP_ENV=test` 下 asyncpg 连接在 CI 中出现事件循环污染。
-   - 处理: `test` 环境改用 `NullPool`，预检恢复通过。
-5. 生产页面“已更新但手机无变化”
-   - 根因: Service Worker 缓存版本未滚动，客户端持续命中旧静态资源。
-   - 处理: 提升 SW 版本、启动时主动 `registration.update()`、引导用户清理旧站点缓存。
-6. 安装入口“一次取消后找不到”
-   - 根因: 安装按钮显隐依赖 `beforeinstallprompt`，取消后事件对象失效导致入口被隐藏。
-   - 处理: 改为“未安装状态下始终可见安装入口”，无 prompt 时回退手动安装引导。
-7. 桌面图标不明显
-   - 根因: 早期图标资源为纯色块，缺少可识别视觉元素。
-   - 处理: 替换为品牌图标并补齐 `maskable` 资源。
+关键进展:
+
+1. Cloudflare 迁移问题定位完成，形成完整故障链路
+2. 新增 Pages Functions API 代理（`/api/*`）
+3. 新增 `/health-backend` 代理健康检查入口
+4. 前端生产环境强制同域 API（不再依赖旧本地 API 配置）
+5. Service Worker 策略收敛（不拦截导航/API，不缓存 `app.js`）
+6. SW 版本滚动到 `v10`，解决旧缓存持续命中问题
+7. Cloudflare 双项目发布成功并通过全链路烟测
+
+## 3. Cloudflare 迁移故障复盘（详细）
+
+### 3.1 用户侧核心现象
+
+1. 页面可打开，但刷新后偶发无法访问
+2. 登录成功后约 1 秒提示“当前离线或网络不可用”
+3. 页面可访问但业务 API 不可用
+4. 已发布新版本但手机端“看起来没有更新”
+
+### 3.2 根因拆解（前因后果）
+
+#### 根因 A: 平台规则差异
+
+1. 迁移前前端在 Vercel，依赖 `vercel.json` rewrite
+2. 迁移到 Cloudflare 后，这些 rewrite 不会自动生效
+3. 结果: 页面可访问，但 `/api/*` 没有按预期转发到后端
+
+#### 根因 B: 客户端历史配置与新拓扑冲突
+
+1. 浏览器本地保留旧 `api_base_url`
+2. 登录后前端会立即请求历史会话接口
+3. 该请求可能命中不可达旧地址，触发 `fetch` 异常
+4. 前端错误分类将其展示为“离线”
+
+#### 根因 C: Service Worker 缓存策略过重
+
+1. 旧策略缓存了 `app.js`
+2. 新代码发布后客户端仍运行旧脚本
+3. 旧逻辑继续触发旧 API/旧行为，造成“修了但用户端无变化”
+
+#### 根因 D: Service Worker 拦截面过大
+
+1. 早期 SW 参与导航/API 请求路径
+2. 在部分移动浏览器中，缓存或网络异常会被放大成页面/接口失败
+
+### 3.3 修复矩阵
+
+1. 现象: 页面可开但 API 失败
+   - 修复: 增加 `functions/api/[[path]].js` 同域反向代理
+2. 现象: 登录后秒变“离线”
+   - 修复: 生产强制同域 API；旧配置不再影响线上
+3. 现象: 页面刷新后不稳定
+   - 修复: SW 不拦截导航
+4. 现象: 已发布但逻辑不更新
+   - 修复: SW 版本升级 + 停止缓存 `app.js`
+5. 现象: 无法快速判断后端是否连通
+   - 修复: 增加 `/health-backend` 可视化健康检查
+
+### 3.4 本次经验沉淀
+
+1. “静态页可访问”不等于“应用可用”
+2. 迁移必须按顺序验收:
+   - 静态 -> 代理健康 -> API 预检 -> 业务全链路
+3. 对 PWA 项目，迁移时必须先处理 SW 策略与版本
+4. 同域 API 代理比跨域直连更稳，尤其在移动网络环境
 
 ## 4. 本阶段关键决策
 
-1. 线上仅开放 Supabase 鉴权入口，隐藏 mock 入口。
-2. mock 仅用于本地联调，并加生产安全开关限制。
-3. 发布前必须执行自动化预检，且至少覆盖:
-   - 后端测试
-   - RLS 隔离校验
-   - Supabase JWT API 冒烟
-4. 当前阶段不做外接可观测性（日志平台/告警通道），仅保留内建 `/ops/metrics`。
-5. 在线模型回归采用灰度策略：
-   - 默认关闭
-   - 在有 `LLM_API_KEY` 且配额健康时手动开启
-6. 当前阶段仅推进 PWA，不启动小程序/安卓/iOS 的开发。
-7. 部署迁移策略采用分阶段方式:
-   - 先落地 A 方案
-   - A 方案观察期后再决定是否触发 B 方案
-8. 迁移执行决策已确认:
-   - 先用 `*.pages.dev` 跑通 A 方案
-   - B 方案暂不实施
+1. 线上仅开放 Supabase 鉴权入口，隐藏 mock 入口
+2. Cloudflare A 方案落地后，前端生产 API 固定同域 `/api/*`
+3. 保留 Vercel 后端作为稳定服务与回滚锚点
+4. Service Worker 长期策略:
+   - 不缓存主业务脚本
+   - 仅缓存低风险静态资源
+5. B 方案（Cloudflare + Render）暂不实施，仅作为备选
 
 ## 5. 验证结果
 
 本地验证:
 
 1. `pytest backend/tests -q` 通过（25 passed, 2 skipped）
-2. `node --check web/app.js` 通过
-3. `SKIP_REMOTE_API_SMOKE=1 SKIP_RLS_ISOLATION=1 bash scripts/release_preflight.sh` 通过
-4. OFNR 离线回归（`v0.2`）通过
-5. 在线回归模式脚本路径验证通过（`--mode online`，空 key 回退场景）
-6. `RUN_ONLINE_OFNR_EVAL` 联动脚本与 CI 开关逻辑验证通过
-7. `bash scripts/pwa_smoke_check.sh` 通过
-8. `bash -n scripts/vercel_release.sh` 通过
-9. 预检已包含 PWA 冒烟检查并通过
-10. `sw.js` 版本升级与资源缓存列表校验通过
+2. `bash scripts/pwa_smoke_check.sh` 通过
+3. `python scripts/run_ofnr_eval.py --mode offline` 通过
+4. `bash scripts/rls_isolation_check.sh` 通过
 
-云端验证:
+线上验证:
 
-1. GitHub Actions 完整预检通过:
-   - `https://github.com/Leon-Algo/Nonviolent-Communicator/actions/runs/21979380349`
-2. 该次预检已包含并通过:
-   - RLS isolation check
-   - Supabase JWT API smoke（含历史回看接口路径）
-3. 最新 Vercel Production 部署:
-   - 前端: `https://nvc-practice-web.vercel.app`
-   - 后端: `https://api.leonalgo.site`
+1. Cloudflare Pages 发布完成（stable/main 双项目）
+2. `/health-backend` 返回后端 JSON
+3. `OPTIONS /api/v1/scenes` 预检通过
+4. `scripts/supabase_jwt_api_smoke_test.sh <front_domain>` 全 7 步通过
 
 ## 6. 当前状态结论
 
-项目已进入“可上线演示、可回归验证、具备基础安全隔离”的阶段，且 M3 PWA 关键体验（安装、图标、更新、入口可恢复）已完成一轮收口。下一阶段进入部署迁移实施（M4）。
+项目已进入“Cloudflare 前端可稳定访问 + 功能全链路可用 + 可回归验证”的状态。
 
 ## 7. 下一阶段重点
 
-1. 执行方案 A（Cloudflare 前端 + Vercel 后端）并完成完整回归
-2. 观察 A 方案稳定性与访问表现，决定是否触发方案 B
-3. 若触发 B，完成 Render 后端迁移与回滚演练
-4. PWA 体验优化继续增量推进（不阻塞迁移主线）
+1. 整理迁移运行手册并固化到文档
+2. 观察稳定域名 3-7 天访问表现
+3. 视稳定性结果评估是否接入 `leonalgo.site`
+4. 在不影响稳定性的前提下继续优化新手体验与转化

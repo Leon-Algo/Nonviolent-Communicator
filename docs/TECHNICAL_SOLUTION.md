@@ -1,35 +1,48 @@
-# 技术方案（Python + Supabase + PWA，含 Cloudflare/Render 迁移设计）
+# 技术方案（Python + Supabase + PWA，Cloudflare A 已落地）
 
 ## 0. 文档信息
 
-- 版本: v1.3（迁移设计版）
-- 更新日期: 2026-02-22
-- 范围: MVP 当前实现、部署迁移方案与约束
+- 版本: v1.4（迁移复盘稳定版）
+- 更新日期: 2026-02-23
+- 范围: 当前线上架构、Cloudflare 迁移故障根因、修复方案与防回归规则
 
-## 1. 方案结论
+## 1. 当前结论（已实施）
 
 1. 后端框架: `FastAPI + Pydantic v2 + SQLAlchemy(async)`
 2. 数据库: `Supabase PostgreSQL`（Pooler 连接）
 3. 鉴权策略:
    - 线上: Supabase JWT
    - 本地开发: Mock Token（受开关控制）
-4. 当前部署基线: 前后端在 Vercel，前端已 PWA 化
-5. 迁移候选:
-   - `方案 A`（最低改动）: Cloudflare Pages 前端 + 现有 Vercel 后端
-   - `方案 B`（中改动）: Cloudflare Pages 前端 + Render 后端
-6. AI: ModelScope OpenAI-compatible API
+4. 当前部署基线:
+   - 前端: Cloudflare Pages（静态 + Pages Functions）
+   - 后端: Vercel（FastAPI）
+5. 前端 API 调用策略（生产）:
+   - 强制同域调用 `/api/*`
+   - 由 Cloudflare Pages Functions 反向代理到 Vercel API
+6. PWA/Service Worker 当前策略:
+   - 不拦截导航请求
+   - 不拦截 API 请求
+   - 不缓存 `app.js`
+   - 仅缓存样式/图片/字体等静态资源
+7. AI: ModelScope OpenAI-compatible API
 
-## 2. 系统架构（当前）
+## 2. 系统架构（当前线上）
 
 ```mermaid
 flowchart LR
-  U["Web/PWA"] --> API["FastAPI (Vercel)"]
+  U["Mobile/Desktop Browser"] --> CF["Cloudflare Pages (Static)"]
   U --> SA["Supabase Auth API"]
-  API --> AUTH["Auth Layer"]
-  API --> SVC["Service Layer"]
-  SVC --> DB["Supabase PostgreSQL"]
-  SVC --> LLM["ModelScope LLM"]
+  U --> CFAPI["Cloudflare Pages Functions /api/*"]
+  CFAPI --> API["FastAPI (Vercel)"]
+  API --> DB["Supabase PostgreSQL"]
+  API --> LLM["ModelScope LLM"]
 ```
+
+关键路径:
+
+1. 页面资源: 浏览器 -> Cloudflare 静态资源
+2. 业务接口: 浏览器 -> 同域 `/api/*` -> Pages Functions -> Vercel API
+3. 登录鉴权: 浏览器 -> Supabase Auth（拿 JWT）-> 调后端接口
 
 ## 3. 后端设计
 
@@ -59,7 +72,7 @@ flowchart LR
 
 ### 4.3 数据隔离
 
-1. 核心业务表已启用 RLS
+1. 核心业务表启用 RLS
 2. 请求级注入 DB 上下文: `SET LOCAL ROLE authenticated` + JWT `sub`
 
 ## 5. 数据库策略
@@ -72,127 +85,153 @@ flowchart LR
 4. `0004_enable_rls_core_tables.sql`
 5. `0005_fix_request_user_id_claim_resolution.sql`
 
-## 6. AI 调用策略
+## 6. Cloudflare 迁移事故复盘（核心）
 
-1. 统一经 `nvc_service` 输出结构化结果
-2. 对模型异常返回做容错解析
-3. 保持响应结构稳定，避免前端联调漂移
+本次迁移不是单点故障，而是多因素叠加。以下按“用户看到的现象 -> 真实原因 -> 已落地修复”说明。
 
-## 7. 部署与迁移设计
+### 6.1 现象 A: 页面能打开，但刷新后偶发不可达
 
-### 7.1 当前生产基线（保留）
+真实原因:
 
-1. 前端: `https://nvc-practice-web.vercel.app`
-2. 后端: `https://api.leonalgo.site`（备用 `https://nvc-practice-api.vercel.app`）
-3. Vercel 发布与回滚脚本: `scripts/vercel_release.sh`
+1. 早期 Service Worker 过度接管导航请求
+2. 部分移动浏览器中 `Cache Storage` 异常会放大为导航失败（`ERR_FAILED`）
 
-### 7.2 方案 A（推荐先落地）
+修复:
 
-Cloudflare 承接前端静态/PWA，后端仍在 Vercel。
+1. 取消导航拦截
+2. 缓存读写增加容错
+3. SW 版本连续滚动，清理旧缓存
 
-```mermaid
-flowchart LR
-  U["Cloudflare Pages (Web/PWA)"] --> API["FastAPI (Vercel)"]
-  U --> SA["Supabase Auth API"]
-  API --> DB["Supabase PostgreSQL"]
-  API --> LLM["ModelScope LLM"]
-```
+实现位置:
 
-最小改动点:
+- `web/sw.js`
 
-1. Cloudflare Pages 新建项目，根目录指向 `web/`
-2. 前端 `apiBaseUrl` 默认指向 Vercel API 公网域名
-3. 后端 CORS 增加 Cloudflare 域名（`*.pages.dev` 与可选自定义域名）
-4. 保留现有后端代码与 Vercel 部署脚本
+### 6.2 现象 B: 登录后 1 秒出现“当前离线或网络不可用”
 
-适用场景:
+真实原因链:
 
-1. 预算优先、快速验证优先
-2. 希望先提升前端页面可达性，再观察 API 质量
+1. 登录本身成功（Supabase）
+2. 登录成功后前端会立即请求历史会话接口
+3. 该请求在部分客户端仍打到旧 API 地址（历史本地配置）或经旧 SW 逻辑失败
+4. 前端把 `fetch` 异常归类为 offline-like 错误，显示离线提示
 
-### 7.3 方案 B（作为 A 的增强备选）
+修复:
 
-前端在 Cloudflare，后端从 Vercel 迁至 Render（Python Web Service）。
+1. 生产环境强制同域 API 基址（不再依赖历史本地 `api_base_url`）
+2. 同域 `/api/*` 统一走 Cloudflare Functions 代理
+3. SW 不再拦截 API
 
-```mermaid
-flowchart LR
-  U["Cloudflare Pages (Web/PWA)"] --> API["FastAPI (Render SG)"]
-  U --> SA["Supabase Auth API"]
-  API --> DB["Supabase PostgreSQL"]
-  API --> LLM["ModelScope LLM"]
-```
+实现位置:
 
-改动点:
+- `web/app.js`
+- `functions/api/[[path]].js`
 
-1. Render 新建 Python Web Service（仓库路径 `backend/`）
-2. 启动命令示例: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-3. 全量迁移后端环境变量与健康检查（`/health`）
-4. 前端 API 域名切换到 Render 服务域名
-5. CORS 从 `vercel.app` 扩展到 `pages.dev` + `onrender.com` + 可选自定义域名
+### 6.3 现象 C: Cloudflare 页面可访问，但业务接口全部失败
 
-适用场景:
+真实原因:
 
-1. 方案 A 下 API 仍不稳定或延迟不可接受
-2. 可接受 Render 免费实例冷启动带来的首次请求延迟
+1. Cloudflare Pages 默认是静态托管
+2. `vercel.json` 的 rewrite 规则不会被 Cloudflare 执行
 
-### 7.4 配置矩阵（迁移期）
+修复:
 
-| 配置项 | 方案 A | 方案 B |
-| --- | --- | --- |
-| 前端托管 | Cloudflare Pages | Cloudflare Pages |
-| 后端托管 | Vercel | Render（Singapore） |
-| 前端 API 默认地址 | `https://api.leonalgo.site` | `<render-api-domain>` |
-| `CORS_ORIGINS` | `localhost + pages.dev + 自定义域` | `localhost + pages.dev + 自定义域` |
-| `CORS_ORIGIN_REGEX` | 建议 `https://.*\\.pages\\.dev` | 建议 `https://.*\\.pages\\.dev` |
-| 后端发布脚本 | `scripts/vercel_release.sh` | 新增 Render 发布步骤（文档化） |
+1. 新增 Pages Functions 反向代理
+2. `/health-backend` 单独提供后端连通健康检查
 
-### 7.5 发布与回滚策略
+实现位置:
 
-1. 方案 A 回滚:
-   - Cloudflare 前端回滚到上一部署
-   - API 继续使用现有 Vercel 稳定版本
-2. 方案 B 回滚:
-   - 前端回滚同上
-   - API 域名切回 Vercel（保留 Vercel 后端作为热备）
-3. 迁移期不移除现有 Vercel API，直到连续验收通过
-4. 方案 A 发布脚本:
-   - `bash scripts/cloudflare_pages_release.sh deploy <cf_pages_project_name>`
+- `functions/api/[[path]].js`
+- `functions/health-backend.js`
 
-### 7.6 成本与体验预期
+### 6.4 现象 D: 已部署新版本，但手机体验“像没更新”
 
-1. 方案 A: 新增成本几乎为 0，迁移速度最快
-2. 方案 B: Render 免费可试运行，但存在 15 分钟空闲休眠与冷启动
-3. 两个方案都不改变 Supabase 跨境依赖，不能承诺“大陆 100% 稳定”
+真实原因:
 
-## 8. 测试与预检
+1. 旧 SW 缓存命中旧 `app.js`
+2. 客户端继续执行旧逻辑
 
-### 8.1 通用自动化
+修复:
+
+1. SW 版本升级到 `v10`
+2. 停止缓存 `app.js`
+3. 发布后建议用一次 `?pwa=0` 清理旧 SW，再恢复正常访问
+
+实现位置:
+
+- `web/sw.js`
+
+## 7. 当前部署与域名策略
+
+### 7.1 当前稳定基线
+
+1. 前端稳定域名: `https://nonviolent-communicator-stable.pages.dev`
+2. 前端主域名: `https://nonviolent-communicator.pages.dev`
+3. 后端目标: `https://nvc-practice-api.vercel.app`（由 Pages Functions 代理）
+4. 健康检查: `<front-domain>/health-backend`
+
+### 7.2 反向代理约束
+
+1. 前端生产请求必须优先同域 `/api/*`
+2. 仅在本地开发环境允许自定义 API 基址
+3. 代理层必须透传 `Authorization` 与请求体
+4. 代理返回必须带 `x-api-proxy: cloudflare-pages` 便于排查
+
+### 7.3 发布与回滚
+
+1. Cloudflare 前端发布: `scripts/cloudflare_pages_release.sh`
+2. Vercel 后端发布/回滚: `scripts/vercel_release.sh`
+3. 回滚优先级:
+   - 前端先回滚到上一 Pages 部署
+   - 后端保持 Vercel 稳定版本
+
+## 8. 测试与预检（当前标准）
+
+### 8.1 自动化
 
 1. `pytest backend/tests -q`
 2. `python scripts/run_ofnr_eval.py --mode offline`
 3. `bash scripts/rls_isolation_check.sh`
-4. `bash scripts/supabase_jwt_api_smoke_test.sh <api_url>`
-5. `bash scripts/release_preflight.sh <api_url>`
-6. `bash scripts/pwa_smoke_check.sh`
+4. `bash scripts/supabase_jwt_api_smoke_test.sh <front_domain>`
+5. `bash scripts/pwa_smoke_check.sh`
 
 ### 8.2 迁移专项验收
 
-1. 首屏加载可达（4G/家宽各 1 轮）
-2. 主链路: 注册/登录 -> 创建场景 -> 发送消息 -> 生成总结 -> 复盘
-3. 历史会话列表与单会话回看
-4. PWA 安装、取消后重试、离线壳、更新提示
-5. 连续 24 小时内多次请求无大面积 `Failed to fetch`
+按顺序执行（必须顺序化）:
 
-## 9. 当前技术边界
+1. 静态可达检查: `/`, `/diag`, `/ping.txt`
+2. 代理可达检查: `/health-backend` 返回后端 JSON
+3. 代理穿透检查: `OPTIONS /api/v1/scenes` CORS 预检成功
+4. 业务烟测: 注册/登录 -> 创建场景 -> 会话 -> 消息 -> 总结 -> 历史 -> 周进度
+5. PWA 验收: 安装、取消重试、刷新、版本更新
 
-1. 海外部署对中国大陆访问存在天然不确定性
-2. Supabase Auth 与数据库仍为跨境链路
-3. Render 免费实例有冷启动，不能作为稳定生产 SLA 承诺
-4. 当前阶段不接入外部日志平台/告警通道
-5. 微信小程序与原生 App 暂不进入实现
+## 9. 防回归规则（迁移类变更必守）
 
-## 10. 当前决策状态（已确认）
+1. 改 API 路由策略时，必须同时更新:
+   - `web/app.js`
+   - `functions/api/[[path]].js`
+   - `docs/SETUP_AND_TESTING.md`
+2. 改 SW 缓存策略时，必须:
+   - 提升 `SW_VERSION`
+   - 说明是否缓存 `app.js`
+   - 补一次 PWA 烟测
+3. 每次迁移发布后必须记录:
+   - 发布域名
+   - commit hash
+   - 烟测结果
+4. 文档必须同步到:
+   - `docs/STAGE_REVIEW.md`
+   - `docs/TECHNICAL_SOLUTION.md`
+   - `docs/SETUP_AND_TESTING.md`
 
-1. 先执行 `A only`（Cloudflare Pages + Vercel API），不并行启动 `B`
-2. Cloudflare 先用 `*.pages.dev` 完整验证，再评估接入 `leonalgo.site`
-3. 方案 B 暂不实施，仅作为 A 失败时的替代路线
+## 10. 当前技术边界
+
+1. 海外链路在中国大陆网络仍有不确定性
+2. Supabase Auth/DB 仍是跨境依赖
+3. 当前阶段不接入外部日志平台/告警通道
+4. 微信小程序与原生 App 暂不进入实现
+
+## 11. 当前决策状态（已确认）
+
+1. `A only` 已落地并稳定化: Cloudflare 前端 + Vercel 后端
+2. `B`（Cloudflare + Render）暂不实施，仅保留为替代方案
+3. 优先保障 Web/PWA 稳定可用，再讨论多端扩展
