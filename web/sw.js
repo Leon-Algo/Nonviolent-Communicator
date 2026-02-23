@@ -1,4 +1,4 @@
-const SW_VERSION = "v7";
+const SW_VERSION = "v8";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/styles.css",
