@@ -4,7 +4,11 @@ function byId(id) {
 
 const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
-const DEFAULT_API_BASE_URL = "https://api.leonalgo.site";
+const DEFAULT_API_BASE_URL = "";
+const LEGACY_REMOTE_API_BASE_URLS = new Set([
+  "https://api.leonalgo.site",
+  "https://nvc-practice-api.vercel.app",
+]);
 const RUNTIME_STATE_KEY = "runtime_state_v2";
 const HISTORY_VIEW_STATE_KEY = "history_view_state_v1";
 const HISTORY_DEFAULT_LIMIT = 10;
@@ -125,7 +129,8 @@ function isEdgeAndroidBrowser() {
 }
 
 function resolveDefaultApiBaseUrl() {
-  return DEV_CONTEXT ? window.location.origin : DEFAULT_API_BASE_URL;
+  if (DEV_CONTEXT) return window.location.origin;
+  return DEFAULT_API_BASE_URL || window.location.origin;
 }
 
 function ensureUserId() {
@@ -1965,7 +1970,9 @@ function loadConfig() {
   const defaultApiBase = resolveDefaultApiBaseUrl();
   const savedApiRaw = normalizeApiBaseUrl(localStorage.getItem("api_base_url") || "");
   const isSameOriginApi = savedApiRaw === window.location.origin;
-  const shouldMigrateLegacyProxy = !DEV_CONTEXT && (!savedApiRaw || isSameOriginApi);
+  const isLegacyRemoteApi = LEGACY_REMOTE_API_BASE_URLS.has(savedApiRaw);
+  const shouldMigrateLegacyProxy =
+    !DEV_CONTEXT && (!savedApiRaw || isSameOriginApi || isLegacyRemoteApi);
   const resolvedApi = shouldMigrateLegacyProxy ? defaultApiBase : savedApiRaw || defaultApiBase;
 
   byId("apiBaseUrl").value = resolvedApi;

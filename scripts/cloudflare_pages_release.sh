@@ -14,15 +14,17 @@ MODE="${1:-deploy}"
 PROJECT_NAME="${2:-${CF_PAGES_PROJECT_NAME:-}}"
 BRANCH="${3:-}"
 PUBLISH_DIR="${4:-${ROOT_DIR}/web}"
+FUNCTIONS_DIR="${5:-${ROOT_DIR}/functions}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/cloudflare_pages_release.sh deploy <project_name> [branch] [publish_dir]
+  bash scripts/cloudflare_pages_release.sh deploy <project_name> [branch] [publish_dir] [functions_dir]
 
 Examples:
   bash scripts/cloudflare_pages_release.sh deploy nvc-practice-web-cf
   bash scripts/cloudflare_pages_release.sh deploy nvc-practice-web-cf preview ./web
+  bash scripts/cloudflare_pages_release.sh deploy nvc-practice-web-cf main ./web ./functions
 
 Required env vars:
   CLOUDFLARE_API_TOKEN
@@ -77,8 +79,13 @@ deploy_pages() {
   echo "[INFO] project: ${PROJECT_NAME}"
   echo "[INFO] branch: ${branch}"
   echo "[INFO] publish dir: ${PUBLISH_DIR}"
+  if [[ -d "${FUNCTIONS_DIR}" ]]; then
+    echo "[INFO] functions dir: ${FUNCTIONS_DIR}"
+  else
+    echo "[INFO] functions dir not found, skip pages functions"
+  fi
 
-  npx --yes wrangler pages deploy "${PUBLISH_DIR}" \
+  npx --yes wrangler --cwd "${ROOT_DIR}" pages deploy "${PUBLISH_DIR}" \
     --project-name "${PROJECT_NAME}" \
     --branch "${branch}" \
     --commit-dirty=true
