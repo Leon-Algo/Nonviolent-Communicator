@@ -141,6 +141,37 @@
         <p id="noticeBar" class="notice is-hidden"></p>
       </section>
 
+      <section id="quickCheckPanel" class="panel">
+        <div class="panel-title-row">
+          <h2>连接自检（快速）</h2>
+          <button id="runQuickCheckBtn" type="button" class="tone-ghost">运行自检</button>
+        </div>
+        <p id="quickCheckSummary" class="meta quick-check-summary is-idle">
+          用于快速定位“网页能打开但功能异常”的问题。
+        </p>
+        <ul class="quick-check-list">
+          <li>
+            <span>静态资源</span>
+            <code id="quickCheckStatic" class="quick-check-badge is-idle">未执行</code>
+          </li>
+          <li>
+            <span>后端代理</span>
+            <code id="quickCheckBackend" class="quick-check-badge is-idle">未执行</code>
+          </li>
+          <li>
+            <span>业务 API</span>
+            <code id="quickCheckApi" class="quick-check-badge is-idle">未执行</code>
+          </li>
+          <li>
+            <span>登录状态</span>
+            <code id="quickCheckAuth" class="quick-check-badge is-idle">未执行</code>
+          </li>
+        </ul>
+        <p class="meta compact-meta">
+          若“后端代理”失败，请先直接打开 <code>/health-backend</code> 查看是否返回 JSON。
+        </p>
+      </section>
+
       <section id="practicePanel" class="panel">
         <div class="panel-title-row">
           <h2>Step 2. 开始对练</h2>

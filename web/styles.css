@@ -373,6 +373,76 @@ button.tone-ghost {
   background: #ffecee;
 }
 
+.quick-check-summary.is-running {
+  color: #8a4f00;
+}
+
+.quick-check-summary.is-pass {
+  color: var(--ok);
+}
+
+.quick-check-summary.is-warn {
+  color: var(--warn);
+}
+
+.quick-check-summary.is-fail {
+  color: var(--danger);
+}
+
+.quick-check-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.quick-check-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #d7e0e8;
+  background: #f8fbfd;
+  padding: 8px 10px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.quick-check-badge {
+  border: 1px solid var(--line);
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-check-badge.is-idle {
+  background: #edf4fb;
+  color: #3d5366;
+}
+
+.quick-check-badge.is-running {
+  background: #fff3df;
+  color: #8a4f00;
+}
+
+.quick-check-badge.is-pass {
+  background: #e8f8ef;
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.quick-check-badge.is-warn {
+  background: #fff4e8;
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.quick-check-badge.is-fail {
+  background: #ffecee;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .feedback-grid,
 .summary-grid {
   display: grid;

@@ -5,10 +5,11 @@ function byId(id) {
 const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
 const DEFAULT_API_BASE_URL = "";
-const LEGACY_REMOTE_API_BASE_URLS = new Set([
-  "https://api.leonalgo.site",
-  "https://nvc-practice-api.vercel.app",
-]);
+const QUICK_CHECK_ENDPOINTS = {
+  ping: "/ping.txt",
+  backendHealth: "/health-backend",
+  sessionProbe: "/api/v1/sessions?limit=1&offset=0",
+};
 const RUNTIME_STATE_KEY = "runtime_state_v2";
 const HISTORY_VIEW_STATE_KEY = "history_view_state_v1";
 const HISTORY_DEFAULT_LIMIT = 10;
@@ -97,6 +98,10 @@ const pwa = {
   shouldReloadOnControllerChange: false,
 };
 
+const quickCheck = {
+  running: false,
+};
+
 const state = {
   sceneId: "",
   sessionId: "",
@@ -153,14 +158,53 @@ function parseJson(text, fallback = {}) {
   }
 }
 
-function isOfflineLikeError(error) {
+class ApiRequestError extends Error {
+  constructor(message, details = {}) {
+    super(message);
+    this.name = "ApiRequestError";
+    Object.assign(this, details);
+  }
+}
+
+function parseLeadingStatusCode(message) {
+  const match = String(message || "").match(/^\s*(\d{3})\b/);
+  if (!match) return 0;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getErrorDetails(error) {
   const message = String(error?.message || error || "");
   const normalized = message.toLowerCase();
-  return (
-    normalized.includes("offline") ||
+  const responseData =
+    error?.responseData && typeof error.responseData === "object" ? error.responseData : {};
+  const status = Number(error?.status || parseLeadingStatusCode(message) || 0);
+  const errorCode = String(error?.errorCode || responseData.error_code || "").trim();
+  const requestId = String(error?.requestId || responseData.request_id || "").trim();
+  const isNetworkError =
+    Boolean(error?.isNetworkError) ||
     normalized.includes("failed to fetch") ||
-    normalized.includes("networkerror") ||
-    normalized.includes("service unavailable")
+    normalized.includes("networkerror");
+  return {
+    message,
+    normalized,
+    status,
+    errorCode,
+    requestId,
+    responseData,
+    isNetworkError,
+  };
+}
+
+function isOfflineLikeError(error) {
+  const details = getErrorDetails(error);
+  const code = details.errorCode.toLowerCase();
+  return (
+    details.isNetworkError ||
+    details.normalized.includes("offline") ||
+    details.normalized.includes("service unavailable") ||
+    code === "offline" ||
+    code === "upstream_unavailable"
   );
 }
 
@@ -1067,12 +1111,32 @@ function authHeaders(config) {
 }
 
 async function callApi(url, options) {
-  const res = await fetch(url, options);
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (error) {
+    throw new ApiRequestError(`NETWORK_ERROR: ${String(error?.message || error)}`, {
+      kind: "network",
+      url,
+      method: options?.method || "GET",
+      isNetworkError: true,
+      cause: error,
+    });
+  }
   const text = await res.text();
   const data = parseJson(text, text ? { raw: text } : {});
 
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}: ${JSON.stringify(data)}`);
+    throw new ApiRequestError(`${res.status} ${res.statusText}: ${JSON.stringify(data)}`, {
+      kind: "http",
+      status: res.status,
+      statusText: res.statusText,
+      responseData: data,
+      errorCode: String(data?.error_code || ""),
+      requestId: String(data?.request_id || ""),
+      url,
+      method: options?.method || "GET",
+    });
   }
   return data;
 }
@@ -1861,6 +1925,7 @@ function persistSupabaseSession(config, session, message) {
   setAuthMode("supabase");
   localStorage.setItem("supabase_email", config.supabaseEmail);
   localStorage.setItem("supabase_access_token", session.access_token);
+  refreshQuickCheckAuthState();
   setNotice(message, "success");
   setOutput({
     ok: true,
@@ -2359,35 +2424,228 @@ async function continueSessionFromHistory(sessionId) {
   setNotice("已切换到该会话，可直接输入下一句继续练习。", "success");
 }
 
+function setQuickCheckBadgeState(id, text, tone = "idle") {
+  const el = byId(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("is-idle", "is-running", "is-pass", "is-warn", "is-fail");
+  el.classList.add(`is-${tone}`);
+}
+
+function setQuickCheckSummary(text, tone = "idle") {
+  const el = byId("quickCheckSummary");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("is-idle", "is-running", "is-pass", "is-warn", "is-fail");
+  el.classList.add(`is-${tone}`);
+}
+
+function refreshQuickCheckAuthState() {
+  const hasToken = Boolean(byId("supabaseAccessToken")?.value.trim());
+  if (hasToken) {
+    setQuickCheckBadgeState("quickCheckAuth", "已登录（Token 可用）", "pass");
+    return;
+  }
+  setQuickCheckBadgeState("quickCheckAuth", "未登录（可先登录再测）", "warn");
+}
+
+function resetQuickCheckPanel() {
+  setQuickCheckBadgeState("quickCheckStatic", "未执行", "idle");
+  setQuickCheckBadgeState("quickCheckBackend", "未执行", "idle");
+  setQuickCheckBadgeState("quickCheckApi", "未执行", "idle");
+  refreshQuickCheckAuthState();
+  setQuickCheckSummary("用于快速定位“网页可打开但功能异常”的问题。", "idle");
+}
+
+async function probeEndpoint(url, options = {}) {
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      ...options,
+    });
+    const text = await response.text();
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      data: parseJson(text, text ? { raw: text } : {}),
+      text,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      statusText: "",
+      data: null,
+      text: "",
+      networkError: error,
+    };
+  }
+}
+
+async function runQuickConnectivityCheck() {
+  if (quickCheck.running) return;
+  quickCheck.running = true;
+  const runBtn = byId("runQuickCheckBtn");
+  if (runBtn) runBtn.disabled = true;
+
+  setQuickCheckSummary("自检进行中，请稍候...", "running");
+  setQuickCheckBadgeState("quickCheckStatic", "检测中...", "running");
+  setQuickCheckBadgeState("quickCheckBackend", "检测中...", "running");
+  setQuickCheckBadgeState("quickCheckApi", "检测中...", "running");
+  refreshQuickCheckAuthState();
+
+  let failures = 0;
+  let warnings = 0;
+  const checkedAt = Date.now();
+
+  try {
+    const pingProbe = await probeEndpoint(`${QUICK_CHECK_ENDPOINTS.ping}?t=${checkedAt}`);
+    if (pingProbe.networkError || pingProbe.status !== 200 || !String(pingProbe.text).includes("ok")) {
+      setQuickCheckBadgeState("quickCheckStatic", "静态资源异常", "fail");
+      failures += 1;
+    } else {
+      setQuickCheckBadgeState("quickCheckStatic", "静态资源正常", "pass");
+    }
+
+    const backendProbe = await probeEndpoint(`${QUICK_CHECK_ENDPOINTS.backendHealth}?t=${checkedAt}`);
+    const backendHealthy = backendProbe.status === 200 && backendProbe.data?.status === "ok";
+    if (!backendHealthy) {
+      setQuickCheckBadgeState("quickCheckBackend", `后端代理异常 (${backendProbe.status || "-"})`, "fail");
+      failures += 1;
+    } else {
+      setQuickCheckBadgeState("quickCheckBackend", "后端代理正常", "pass");
+    }
+
+    const config = getConfig({ requireAuthToken: false, requireMockUser: false });
+    const hasToken = Boolean(config.supabaseAccessToken);
+    const apiProbe = await probeEndpoint(`${QUICK_CHECK_ENDPOINTS.sessionProbe}&t=${checkedAt}`, {
+      method: "GET",
+      headers: hasToken ? authHeaders(config) : undefined,
+    });
+
+    if (apiProbe.networkError) {
+      setQuickCheckBadgeState("quickCheckApi", "API 不可达（网络异常）", "fail");
+      failures += 1;
+    } else if (hasToken) {
+      if (apiProbe.status === 200) {
+        setQuickCheckBadgeState("quickCheckApi", "API 正常（已鉴权）", "pass");
+      } else if (apiProbe.status === 401) {
+        setQuickCheckBadgeState("quickCheckApi", "API 鉴权失败（请重新登录）", "fail");
+        failures += 1;
+      } else if (apiProbe.status >= 500) {
+        setQuickCheckBadgeState("quickCheckApi", `API 服务异常 (${apiProbe.status})`, "fail");
+        failures += 1;
+      } else {
+        setQuickCheckBadgeState("quickCheckApi", `API 返回异常状态 (${apiProbe.status})`, "warn");
+        warnings += 1;
+      }
+    } else if (apiProbe.status === 401) {
+      setQuickCheckBadgeState("quickCheckApi", "API 可达（未登录，401 符合预期）", "warn");
+      warnings += 1;
+    } else if (apiProbe.status === 200) {
+      setQuickCheckBadgeState("quickCheckApi", "API 可达（无需登录）", "pass");
+    } else {
+      setQuickCheckBadgeState("quickCheckApi", `API 状态异常 (${apiProbe.status})`, "warn");
+      warnings += 1;
+    }
+
+    if (failures === 0 && warnings === 0) {
+      setQuickCheckSummary("自检通过：页面、代理、API 全部正常。", "pass");
+      setNotice("连接自检通过。", "success");
+      return;
+    }
+    if (failures === 0) {
+      setQuickCheckSummary(`自检完成：无阻塞错误，含 ${warnings} 项提示。`, "warn");
+      setNotice("连接自检完成（有提示项）。", "warning");
+      return;
+    }
+    setQuickCheckSummary(`自检发现 ${failures} 项异常，请按状态逐项处理。`, "fail");
+    setNotice("连接自检发现异常，请优先检查“后端代理/API”状态。", "warning");
+  } finally {
+    if (runBtn) runBtn.disabled = false;
+    quickCheck.running = false;
+  }
+}
+
 function showError(err) {
   const msg = String(err?.message || err);
+  const details = getErrorDetails(err);
   const mode = byId("authMode").value || "supabase";
+
+  if (details.isNetworkError) {
+    setNotice("网络连接异常，当前无法连接服务。请先检查网络后重试。", "warning");
+    setOutput({
+      error: msg,
+      category: "network",
+      hint: "可先运行“连接自检”，或访问 /health-backend 确认代理是否可达。",
+    });
+    return;
+  }
+
+  if (details.errorCode.toUpperCase() === "UPSTREAM_UNAVAILABLE" || details.status === 502) {
+    setNotice("后端代理暂时不可用，请稍后重试。", "warning");
+    setOutput({
+      error: msg,
+      category: "proxy_unavailable",
+      request_id: details.requestId || undefined,
+      hint: "可先访问 /health-backend，确认 Cloudflare 到后端链路。",
+    });
+    return;
+  }
+
+  if (
+    mode === "supabase" &&
+    (msg.includes("invalid or expired access token") ||
+      details.status === 401 ||
+      details.errorCode.toUpperCase() === "UNAUTHORIZED")
+  ) {
+    setNotice("Token 无效或过期，请重新登录获取。", "warning");
+    setOutput({
+      error: msg,
+      category: "auth",
+      request_id: details.requestId || undefined,
+      hint: "点击“登录并获取 Token”后重试。",
+    });
+    return;
+  }
+
+  if (details.status === 401 && mode === "mock" && !DEV_CONTEXT) {
+    setNotice("线上环境不支持 Mock 鉴权，请切换 Supabase 登录。", "error");
+    setOutput({ error: msg, category: "auth_mode_mismatch", request_id: details.requestId || undefined });
+    return;
+  }
+
+  if (details.status === 429) {
+    setNotice("请求过于频繁，请稍后再试。", "warning");
+    setOutput({ error: msg, category: "rate_limit", request_id: details.requestId || undefined });
+    return;
+  }
+
+  if (details.status >= 500) {
+    setNotice("服务端暂时异常，请稍后重试。", "error");
+    setOutput({ error: msg, category: "server_error", request_id: details.requestId || undefined });
+    return;
+  }
 
   if (isOfflineLikeError(err)) {
     setNotice("当前离线或网络不可用，请恢复网络后重试。", "warning");
-    setOutput({ error: msg, hint: "离线状态下可先查看本地缓存内容。" });
-    return;
-  }
-
-  if (msg.includes("invalid or expired access token") && mode === "supabase") {
-    setNotice("Token 无效或过期，请重新登录获取。", "warning");
-    setOutput({ error: msg, hint: "点击“登录并获取 Token”后重试。" });
-    return;
-  }
-
-  if (msg.includes("401") && mode === "mock" && !DEV_CONTEXT) {
-    setNotice("线上环境不支持 Mock 鉴权，请切换 Supabase 登录。", "error");
-    setOutput({ error: msg });
+    setOutput({ error: msg, category: "offline_like", hint: "离线状态下可先查看本地缓存内容。" });
     return;
   }
 
   setNotice("操作失败，请查看下方错误详情。", "error");
-  setOutput({ error: msg });
+  setOutput({
+    error: msg,
+    category: "unknown",
+    request_id: details.requestId || undefined,
+  });
 }
 
 function bind() {
   applyModeVisibility();
   loadConfig();
+  resetQuickCheckPanel();
   cleanupHistorySnapshots();
   hydrateRuntimeState();
   hydrateHistoryViewState();
@@ -2431,6 +2689,10 @@ function bind() {
 
   byId("supabaseSignupBtn").addEventListener("click", () => signupSupabase().catch(showError));
   byId("supabaseLoginBtn").addEventListener("click", () => loginSupabase().catch(showError));
+  byId("runQuickCheckBtn").addEventListener("click", () =>
+    runQuickConnectivityCheck().catch(showError)
+  );
+  byId("supabaseAccessToken").addEventListener("input", refreshQuickCheckAuthState);
   byId("gotoPracticeFromAuthBtn").addEventListener("click", () => {
     const mode = byId("authMode").value || "supabase";
     const authDone = mode === "mock" || Boolean(byId("supabaseAccessToken").value.trim());
@@ -2469,6 +2731,7 @@ function bind() {
   byId("clearTokenBtn").addEventListener("click", () => {
     byId("supabaseAccessToken").value = "";
     localStorage.removeItem("supabase_access_token");
+    refreshQuickCheckAuthState();
     state.historyOffset = 0;
     state.historyTotal = 0;
     persistHistoryViewState();
