@@ -115,7 +115,62 @@ const state = {
   historyOffset: 0,
   historyTotal: 0,
   historyLimit: HISTORY_DEFAULT_LIMIT,
+  pendingPracticeAction: null,
 };
+
+function isAuthReady() {
+  const mode = byId("authMode")?.value || "supabase";
+  if (mode === "mock") {
+    return DEV_CONTEXT;
+  }
+  return Boolean(byId("supabaseAccessToken")?.value.trim());
+}
+
+function focusAuthPanel() {
+  const authPanel = byId("authPanel");
+  if (authPanel) {
+    authPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const emailInput = byId("supabaseEmail");
+  const passwordInput = byId("supabasePassword");
+  const nextFocus =
+    emailInput && !emailInput.value.trim()
+      ? emailInput
+      : passwordInput && !passwordInput.value.trim()
+        ? passwordInput
+        : byId("supabaseLoginBtn");
+  if (nextFocus) {
+    nextFocus.focus();
+  }
+}
+
+function queuePendingPracticeAction({ createFresh = false } = {}) {
+  state.pendingPracticeAction = { createFresh };
+  setNotice("已保留当前输入。请先登录，成功后会自动继续发送。", "warning");
+  setOutput({
+    pending_auth: true,
+    category: "auth_gate",
+    next_step: "login_then_resume",
+  });
+  focusAuthPanel();
+}
+
+async function resumePendingPracticeAction() {
+  if (!state.pendingPracticeAction) return;
+  const pendingAction = state.pendingPracticeAction;
+  state.pendingPracticeAction = null;
+  setNotice("登录成功，正在继续刚才的发送动作。", "success");
+  await sendPracticeTurn({ createFresh: pendingAction.createFresh });
+}
+
+async function handlePracticeAttempt({ createFresh = false } = {}) {
+  if (!isAuthReady()) {
+    queuePendingPracticeAction({ createFresh });
+    return;
+  }
+  await sendPracticeTurn({ createFresh });
+}
 
 function isDevContext() {
   const host = window.location.hostname || "";
@@ -1961,7 +2016,8 @@ async function loginSupabase() {
 
   const session = await fetchSupabasePasswordToken(config);
   persistSupabaseSession(config, session, "登录成功，已获取 Access Token。");
-  await fetchSessionHistoryList({ silent: true });
+  fetchSessionHistoryList({ silent: true }).catch(() => {});
+  await resumePendingPracticeAction();
 }
 
 async function signupSupabase() {
@@ -1999,7 +2055,8 @@ async function signupSupabase() {
 
   if (data.access_token) {
     persistSupabaseSession(config, data, "注册成功，已自动登录。");
-    await fetchSessionHistoryList({ silent: true });
+    fetchSessionHistoryList({ silent: true }).catch(() => {});
+    await resumePendingPracticeAction();
     return;
   }
 
@@ -2795,14 +2852,14 @@ function bind() {
   });
 
   byId("startPracticeBtn").addEventListener("click", () =>
-    sendPracticeTurn({ createFresh: true }).catch(showError)
+    handlePracticeAttempt({ createFresh: true }).catch(showError)
   );
   byId("sendMessageBtn").addEventListener("click", () => {
     if (!state.sessionId) {
       setNotice("请先点击“创建场景并发送第 1 轮”。", "warning");
       return;
     }
-    sendPracticeTurn({ createFresh: false }).catch(showError);
+    handlePracticeAttempt({ createFresh: false }).catch(showError);
   });
 
   byId("newSessionBtn").addEventListener("click", () => {

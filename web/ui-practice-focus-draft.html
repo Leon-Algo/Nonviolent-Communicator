@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NVC 练习优先草稿</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f4f9f8;
+        --ink: #123234;
+        --soft-ink: #4d6668;
+        --line: #c7dedd;
+        --accent: #0f8a74;
+        --accent-strong: #0b6f5d;
+        --warm: #f39c42;
+        --card: #ffffff;
+        --shadow: 0 14px 34px rgba(15, 80, 77, 0.14);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Noto Sans SC", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 90% 10%, #d8f5eb 0%, transparent 42%),
+          radial-gradient(circle at 10% 95%, #e6f0ff 0%, transparent 46%),
+          var(--bg);
+      }
+
+      .shell {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 16px 14px 56px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 10px;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(6px);
+      }
+
+      .brand {
+        font-family: "Space Grotesk", sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+      }
+
+      .top-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fff;
+        color: var(--ink);
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:hover {
+        border-color: #8db5b2;
+      }
+
+      .btn-primary {
+        border-color: var(--accent);
+        background: linear-gradient(135deg, var(--accent), #11a085);
+        color: #fff;
+      }
+
+      .btn-primary:hover {
+        border-color: var(--accent-strong);
+        background: linear-gradient(135deg, var(--accent-strong), #0f8a74);
+      }
+
+      .hero {
+        margin-top: 18px;
+        padding: 20px;
+        border: 1px solid #b7d9d4;
+        border-radius: var(--radius);
+        background: linear-gradient(120deg, #ecfffb 0%, #f7feff 100%);
+        box-shadow: var(--shadow);
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-family: "Space Grotesk", sans-serif;
+        font-size: clamp(24px, 5vw, 36px);
+        line-height: 1.15;
+      }
+
+      .hero p {
+        margin: 10px 0 0;
+        color: var(--soft-ink);
+        font-size: 14px;
+      }
+
+      .focus-card {
+        margin-top: 16px;
+        background: var(--card);
+        border: 1px solid #b9dad4;
+        border-radius: 20px;
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .focus-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .focus-title {
+        margin: 0;
+        font-size: 22px;
+        font-family: "Space Grotesk", sans-serif;
+      }
+
+      .focus-tip {
+        color: var(--soft-ink);
+        font-size: 13px;
+        margin: 4px 0 0;
+      }
+
+      .chips {
+        margin-top: 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .chip {
+        border-radius: 999px;
+        padding: 6px 12px;
+        border: 1px solid #a2ccc8;
+        background: #f4fffd;
+        font-size: 12px;
+        color: #1b5850;
+      }
+
+      .grid {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        border: 1px solid #bfd5d8;
+        border-radius: 12px;
+        background: #fff;
+        padding: 10px 12px;
+        color: #1b3f44;
+        font-size: 14px;
+        font-family: inherit;
+      }
+
+      textarea {
+        min-height: 132px;
+        resize: vertical;
+      }
+
+      .main-cta {
+        margin-top: 14px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .main-cta button {
+        padding: 13px;
+        border-radius: 14px;
+        font-size: 15px;
+      }
+
+      .hint {
+        margin: 0;
+        font-size: 12px;
+        color: var(--soft-ink);
+      }
+
+      .result-card {
+        margin-top: 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #f8fdfd;
+        padding: 12px;
+      }
+
+      .result-card h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+
+      .result-card p {
+        margin: 0;
+        font-size: 13px;
+        color: #2e4f52;
+        line-height: 1.5;
+      }
+
+      .tools {
+        margin-top: 16px;
+      }
+
+      .tools button {
+        width: 100%;
+      }
+
+      .drawer {
+        margin-top: 8px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .drawer[hidden] {
+        display: none;
+      }
+
+      details {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.82);
+        padding: 8px 10px;
+      }
+
+      summary {
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .detail-body {
+        margin-top: 10px;
+        color: var(--soft-ink);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+
+      .inline {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .badge {
+        display: inline-flex;
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: #fff4e6;
+        border: 1px solid #e8c08d;
+        font-size: 12px;
+        color: #8b4f00;
+        font-weight: 700;
+      }
+
+      @media (min-width: 760px) {
+        .grid.two {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">NVC PRACTICE COACH</div>
+        <div class="top-actions">
+          <button type="button" id="topLoginBtn">账号</button>
+          <button type="button" id="topToolsBtn">辅助功能</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <h1>先说一句话，<br />立刻拿到非暴力沟通反馈</h1>
+        <p>这是“练习优先”草稿页。登录、自检、引导、复盘默认收起，不打断首次试用。</p>
+      </section>
+
+      <section class="focus-card" aria-label="练习核心区">
+        <div class="focus-head">
+          <div>
+            <h2 class="focus-title">开始练习</h2>
+            <p class="focus-tip">3 秒内可开始：输入场景 + 输入一句话 + 点击发送</p>
+          </div>
+          <span class="badge">首屏核心区</span>
+        </div>
+
+        <div class="chips" role="group" aria-label="场景快捷模板">
+          <button class="chip" data-scene="同事延期反馈">同事延期反馈</button>
+          <button class="chip" data-scene="与上级预期对齐">上级预期对齐</button>
+          <button class="chip" data-scene="跨团队协作冲突">跨团队冲突</button>
+        </div>
+
+        <div class="grid two">
+          <label>
+            场景标题
+            <input id="sceneInput" type="text" placeholder="例如：和同事沟通延期风险" />
+          </label>
+          <label>
+            你的沟通目标
+            <input id="goalInput" type="text" placeholder="例如：确认新里程碑并明确责任" />
+          </label>
+        </div>
+
+        <div class="grid">
+          <label>
+            你想发送的一句话
+            <textarea
+              id="messageInput"
+              placeholder="例如：我观察到这个需求已经延期两次，我有点焦虑，因为这会影响发布时间。我希望我们今天能一起确认新的里程碑。"
+            ></textarea>
+          </label>
+        </div>
+
+        <div class="main-cta">
+          <button type="button" class="btn-primary" id="sendDraftBtn">发送消息并获取反馈</button>
+          <p class="hint">未登录也可以先输入。点击发送时再引导登录，登录后自动继续当前动作。</p>
+        </div>
+
+        <article class="result-card" id="resultCard" aria-live="polite">
+          <h3>反馈预览</h3>
+          <p id="resultText">你发送后，这里会显示“AI 回复 + OFNR 结构化反馈 + 下一句建议”。</p>
+        </article>
+      </section>
+
+      <section class="tools">
+        <button type="button" id="toggleDrawerBtn">展开辅助功能（默认收起）</button>
+        <div class="drawer" id="toolsDrawer" hidden>
+          <details id="loginBlock">
+            <summary>登录与账号（次级）</summary>
+            <div class="detail-body">
+              首次试用建议“先输入后登录”。
+              <div class="inline" style="margin-top: 8px">
+                <button type="button">邮箱注册</button>
+                <button type="button">邮箱登录</button>
+                <button type="button">退出</button>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>连接自检（失败时再用）</summary>
+            <div class="detail-body">
+              仅在发送失败后建议展开，用于检查: 静态资源 / 代理健康 / API 鉴权。
+              <div class="inline" style="margin-top: 8px">
+                <button type="button">运行自检</button>
+                <button type="button">打开 /health-backend</button>
+              </div>
+            </div>
+          </details>
+
+          <details>
+            <summary>新手引导（可选）</summary>
+            <div class="detail-body">
+              引导内容不再抢占首屏。用户可在需要时手动查看“安装、注册、首轮练习”步骤。
+            </div>
+          </details>
+
+          <details>
+            <summary>历史会话与复盘（可选）</summary>
+            <div class="detail-body">
+              历史列表、行动卡导出、复盘问卷统一放入该区，完成首轮后再进入。
+            </div>
+          </details>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const drawer = document.getElementById("toolsDrawer");
+      const toggleDrawerBtn = document.getElementById("toggleDrawerBtn");
+      const topToolsBtn = document.getElementById("topToolsBtn");
+      const topLoginBtn = document.getElementById("topLoginBtn");
+      const loginBlock = document.getElementById("loginBlock");
+      const sendDraftBtn = document.getElementById("sendDraftBtn");
+      const sceneInput = document.getElementById("sceneInput");
+      const messageInput = document.getElementById("messageInput");
+      const resultText = document.getElementById("resultText");
+
+      function revealDrawer() {
+        drawer.hidden = false;
+        toggleDrawerBtn.textContent = "收起辅助功能";
+      }
+
+      function hideDrawer() {
+        drawer.hidden = true;
+        toggleDrawerBtn.textContent = "展开辅助功能（默认收起）";
+      }
+
+      toggleDrawerBtn.addEventListener("click", () => {
+        if (drawer.hidden) {
+          revealDrawer();
+          return;
+        }
+        hideDrawer();
+      });
+
+      topToolsBtn.addEventListener("click", () => {
+        revealDrawer();
+        drawer.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+
+      topLoginBtn.addEventListener("click", () => {
+        revealDrawer();
+        loginBlock.open = true;
+        loginBlock.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+
+      for (const chip of document.querySelectorAll(".chip")) {
+        chip.addEventListener("click", () => {
+          sceneInput.value = chip.dataset.scene || "";
+        });
+      }
+
+      sendDraftBtn.addEventListener("click", () => {
+        const message = messageInput.value.trim();
+        if (!message) {
+          resultText.textContent = "请先输入一句你准备发送的话，再点击按钮。";
+          return;
+        }
+        const scene = sceneInput.value.trim() || "当前场景";
+        resultText.textContent =
+          "已模拟发送：" +
+          scene +
+          "。\n\n建议你把“你们总是...”改为“我观察到...我感到...我希望...”，降低防御感并提高对方回应意愿。";
+      });
+    </script>
+  </body>
+</html>
