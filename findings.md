@@ -56,3 +56,38 @@
 
 ## Visual/Browser Findings
 - 本轮尚未进行图片、PDF 或浏览器视觉检查。
+
+---
+
+## 2026-06-28 Agora Voice Integration Findings
+
+### Architecture Findings
+- Quickstart server README confirms the default managed vendor chain only requires `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`; third-party STT/LLM/TTS keys are not required for the default Deepgram/OpenAI/MiniMax managed setup.
+- `agora-agent-server-sdk` can be lazy-imported from the voice service so the main FastAPI app still imports without Agora credentials or SDK runtime use.
+- Voice start/stop is modeled as stateless control-plane HTTP work; browser RTC/RTM remains the media plane.
+- Persisting `voice_agent_id`, `voice_channel_name`, user/agent UIDs, status, and expiry on `sessions` is sufficient for cross-instance stop/recovery.
+- Extending `sessions/messages` keeps history and review queries unified; separate `voice_sessions` tables are unnecessary for this phase.
+
+### Frontend Findings
+- The current PWA can host a voice mode without introducing React/Next.
+- Service Worker did not need a version bump because no new cached shell asset was added and `app.js` is intentionally not cached.
+- Browser smoke found and fixed one real issue: `renderVoiceState()` initially re-enabled the voice start button even when unauthenticated.
+- Local review found and fixed one backend boundary issue: voice stop/transcript endpoints now reject non-voice sessions instead of mutating text sessions.
+- Local review found and fixed one frontend cleanup risk: if RTC initialization throws after backend voice session creation, the PWA now best-effort stops the backend agent and clears local voice state.
+
+### Verification Findings
+- Local backend unit tests pass: `40 passed, 2 skipped`.
+- DB integration tests remain skipped by default; local Postgres was not available for `RUN_DB_TESTS=1`.
+- In-app Browser plugin could not start due `sandboxCwd` metadata error, so Playwright CLI was used for local browser verification.
+
+### Remaining Decisions
+- No product decision is blocked. Best-practice next step is to add/bundle Agora RTC/RTM SDK assets for the Vanilla PWA and run real credential-based voice start/stop on a preview deployment.
+
+### 2026-06-29 Integration Findings
+- Quickstart frontend uses browser-safe Agora assets already suitable for the Vanilla PWA: `agora-rtc-sdk-ng`, `agora-rtm`, and the framework-agnostic core of `agora-agent-client-toolkit`.
+- `agora-agent-client-toolkit` emits `TRANSCRIPT_UPDATED`; it does not own RTC join/publish, so the PWA still needs to create/join/publish the Agora RTC client directly.
+- Quickstart normalizes transcript items with `uid === "0"` to the local user before rendering. The PWA now applies the same rule so local speech is persisted as `USER`, not `ASSISTANT`.
+- Root `.env` has Supabase/database settings; quickstart `server/.env.local` has `AGORA_APP_ID` and `AGORA_APP_CERTIFICATE`. Local integration needs both files loaded without printing secret values.
+- The main project `.env` also has `DATABASE_URL_5432`, but it still targets the Supabase pooler host instead of a true direct Postgres host.
+- Local Clash Verge is available on `127.0.0.1:7897`; it can proxy `https://api.agora.io/health`, but it does not restore TLS connectivity to Supabase or Agora regional API hosts from this runtime.
+- Forcing Python through SOCKS5 with `PySocks` does not change the outcome: Supabase REST still fails TLS, `asyncpg` against the pooler still reports tenant/sni issues, and direct `db.<project>.supabase.co` still drops the connection.

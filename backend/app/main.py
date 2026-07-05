@@ -14,6 +14,7 @@ from app.api.routers.progress import router as progress_router
 from app.api.routers.reflections import router as reflections_router
 from app.api.routers.scenes import router as scenes_router
 from app.api.routers.sessions import router as sessions_router
+from app.api.routers.voice import router as voice_router
 from app.core.config import settings
 from app.core.errors import (
     ApiError,
@@ -177,6 +178,7 @@ def create_app() -> FastAPI:
     app.include_router(sessions_router)
     app.include_router(reflections_router)
     app.include_router(progress_router)
+    app.include_router(voice_router)
 
     return app
 

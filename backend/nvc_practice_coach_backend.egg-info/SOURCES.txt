@@ -10,6 +10,7 @@ app/api/routers/progress.py
 app/api/routers/reflections.py
 app/api/routers/scenes.py
 app/api/routers/sessions.py
+app/api/routers/voice.py
 app/core/__init__.py
 app/core/config.py
 app/core/errors.py
@@ -26,10 +27,12 @@ app/schemas/progress.py
 app/schemas/reflections.py
 app/schemas/scenes.py
 app/schemas/sessions.py
+app/schemas/voice.py
 app/services/__init__.py
 app/services/nvc_service.py
 app/services/ofnr_eval.py
 app/services/ofnr_eval_online.py
+app/services/voice_agent.py
 nvc_practice_coach_backend.egg-info/PKG-INFO
 nvc_practice_coach_backend.egg-info/SOURCES.txt
 nvc_practice_coach_backend.egg-info/dependency_links.txt
@@ -45,4 +48,7 @@ tests/test_nvc_service.py
 tests/test_observability.py
 tests/test_ofnr_eval.py
 tests/test_ofnr_eval_online.py
+tests/test_session_history_schemas.py
 tests/test_supabase_auth.py
+tests/test_voice_api.py
+tests/test_voice_service.py

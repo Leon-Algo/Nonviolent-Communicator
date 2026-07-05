@@ -75,6 +75,23 @@
 3. 下一轮优化以“练习优先”为核心: 进入页面后先看到可输入、可发送区域
 4. 链路策略更新为“先输入后登录，登录后自动续发”
 
+### 2026-06-28（追加：Agora 语音对练集成）
+
+关键进展:
+
+1. 形成三方共识: 保留 Vanilla PWA，不迁移 Next/React
+2. 语音后端先并入现有 Vercel FastAPI，Cloudflare 继续做同域代理
+3. 去除 quickstart 的内存 `_sessions` 依赖，改为 Supabase 持久化 voice session 状态
+4. 数据模型扩展现有 `sessions/messages`，不新增孤立 `voice_sessions` 表
+5. 新增 `/api/v1/voice/*`、OpenAPI 契约、PWA 语音模式入口与 smoke 检查
+
+验证结果:
+
+1. `pytest backend/tests -q` 通过（41 passed, 2 skipped）
+2. `bash scripts/pwa_smoke_check.sh` 通过
+3. `SKIP_RLS_ISOLATION=1 SKIP_REMOTE_API_SMOKE=1 SKIP_OFNR_EVAL=1 bash scripts/release_preflight.sh` 通过
+4. 浏览器检查通过: 文字/语音模式切换、未登录禁用语音开始、本地 mock 下语音开始按钮可用
+
 ## 3. Cloudflare 迁移故障复盘（详细）
 
 ### 3.1 用户侧核心现象

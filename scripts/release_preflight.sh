@@ -38,6 +38,8 @@ RUN_DB_TESTS="${RUN_DB_TESTS}" pytest backend/tests -q
 
 step "frontend script syntax"
 node --check web/app.js
+node --check scripts/check_voice_pwa_contract.js
+python3 -m py_compile scripts/check_voice_integration_env.py
 
 step "shell script syntax"
 bash -n scripts/api_smoke_test.sh

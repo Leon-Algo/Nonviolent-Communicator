@@ -11,6 +11,11 @@ class SessionState(StrEnum):
     ABANDONED = "ABANDONED"
 
 
+class SessionModality(StrEnum):
+    TEXT = "TEXT"
+    VOICE = "VOICE"
+
+
 class OfnrStatus(StrEnum):
     MISSING = "MISSING"
     WEAK = "WEAK"
@@ -100,6 +105,7 @@ class SessionHistoryListItem(BaseModel):
     scene_id: UUID
     scene_title: str
     state: SessionState
+    modality: SessionModality = SessionModality.TEXT
     current_turn: int = Field(ge=0)
     target_turns: int = Field(ge=5, le=8)
     created_at: datetime
@@ -156,6 +162,7 @@ class SessionHistoryDetailResponse(BaseModel):
     session_id: UUID
     scene: SessionHistoryScene
     state: SessionState
+    modality: SessionModality = SessionModality.TEXT
     current_turn: int = Field(ge=0)
     target_turns: int = Field(ge=5, le=8)
     created_at: datetime

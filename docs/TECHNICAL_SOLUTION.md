@@ -44,6 +44,27 @@ flowchart LR
 2. 业务接口: 浏览器 -> 同域 `/api/*` -> Pages Functions -> Vercel API
 3. 登录鉴权: 浏览器 -> Supabase Auth（拿 JWT）-> 调后端接口
 
+### 2.1 Agora 语音对练扩展
+
+语音对练采用“控制面并入现有后端、媒体面直连 Agora”的轻量集成方案:
+
+```mermaid
+flowchart LR
+  U["Browser PWA"] --> CFAPI["Cloudflare Pages Functions /api/*"]
+  CFAPI --> API["FastAPI (Vercel) /api/v1/voice/*"]
+  API --> DB["Supabase PostgreSQL"]
+  API --> AGREST["Agora ConvoAI REST"]
+  U --> RTC["Agora RTC/RTM"]
+  RTC --> AGENT["Agora Voice Agent"]
+```
+
+关键约束:
+
+1. `POST /api/v1/voice/sessions` 与 `POST /api/v1/voice/sessions/{id}/stop` 必须是短请求。
+2. 后端不保存 Python 内存态 `_sessions`，只把 `agent_id/channel_name/user_uid/agent_uid/status/expires_at` 持久化到 Supabase。
+3. Cloudflare 只继续承担静态站点与 `/api/*` 代理，不作为 Python voice backend 首选。
+4. 若 Vercel 出现 SDK import/build、start/stop 延迟、清理不可靠、固定出网 IP 或后台 worker 需求，再拆到 Render/Fly/Railway/Cloud Run。
+
 ## 3. 后端设计
 
 ### 3.1 分层
@@ -84,6 +105,7 @@ flowchart LR
 3. `0003_sync_auth_users_to_public_users.sql`
 4. `0004_enable_rls_core_tables.sql`
 5. `0005_fix_request_user_id_claim_resolution.sql`
+6. `0006_add_voice_session_support.sql`
 
 ## 6. Cloudflare 迁移事故复盘（核心）
 
@@ -193,6 +215,12 @@ flowchart LR
 3. `bash scripts/rls_isolation_check.sh`
 4. `bash scripts/supabase_jwt_api_smoke_test.sh <front_domain>`
 5. `bash scripts/pwa_smoke_check.sh`
+
+语音集成额外检查:
+
+1. `pytest backend/tests/test_voice_service.py backend/tests/test_voice_api.py -q`
+2. `node scripts/check_voice_pwa_contract.js`
+3. 浏览器手动检查: 文字/语音模式切换、未登录禁用语音开始、本地 mock 下语音开始按钮可用
 
 ### 8.2 迁移专项验收
 

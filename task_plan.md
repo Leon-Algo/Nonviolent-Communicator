@@ -69,3 +69,90 @@ Phase 3
 - 当前发现的核心结构冲突：正式首页把登录、自检放在练习区之前，这与 `UX1` 的目标直接相反。
 - 当前发现的核心交互冲突：发送按钮没有“保存输入 -> 引导登录 -> 登录后自动续发”的机制。
 - 当前已完成的真实实现：`startPracticeBtn` 支持 auth gate，`loginSupabase()` / `signupSupabase()` 支持自动续发。
+
+---
+
+# Task Plan: Agora Voice Agent 集成
+
+## Goal
+把 `agent-quickstart-python` 的 Agora 语音 Agent 能力按三方共识集成回主项目: 保留 Vanilla PWA，控制面并入现有 Vercel FastAPI，状态持久化到 Supabase，并复用现有历史/复盘链路。
+
+## Current Phase
+Phase 8 in progress
+
+## Phases
+
+### Phase 1: Database Schema
+- [x] 扩展 `sessions/messages` 支持语音会话状态、RTC UID、转录来源与幂等 turn id
+- [x] 将 `0006_add_voice_session_support.sql` 纳入 DB 集成测试迁移清单
+- **Status:** complete
+
+### Phase 2: Stateless Agora Service
+- [x] 新增 `VoiceAgentService`
+- [x] Agora SDK lazy import，避免未配置 SDK 时影响主应用启动
+- [x] 配置集中到 `backend/app/core/config.py`
+- **Status:** complete
+
+### Phase 3: Voice API
+- [x] 新增 `/api/v1/voice/sessions`
+- [x] 新增 `/api/v1/voice/sessions/{session_id}/stop`
+- [x] 新增 `/api/v1/voice/sessions/{session_id}/transcripts`
+- [x] 同步 OpenAPI
+- **Status:** complete
+
+### Phase 4: History Compatibility
+- [x] 历史列表与详情返回 `modality`
+- [x] 语音会话复用现有 sessions/messages/feedback_items 链路
+- **Status:** complete
+
+### Phase 5: PWA Voice Mode
+- [x] 新增文字/语音模式切换
+- [x] 新增语音 start/stop API 生命周期
+- [x] 新增浏览器 RTC SDK 接缝，未加载 SDK 时给出明确状态
+- [x] 浏览器检查未登录禁用、Mock 模式启用
+- **Status:** complete
+
+### Phase 6: Smoke / Release Checks
+- [x] 新增 `scripts/check_voice_pwa_contract.js`
+- [x] `pwa_smoke_check.sh` 纳入 voice contract 和 `web/app.js` 语法检查
+- [x] `release_preflight.sh` 纳入 voice contract 脚本语法检查
+- **Status:** complete
+
+### Phase 7: Documentation
+- [x] 更新技术方案、测试指南、开发计划、阶段复盘、后端 README
+- **Status:** complete
+
+### Phase 8: Real SDK Assets & Integration
+- [x] 从 `agent-quickstart-python` 复用 Agora RTC/RTM/toolkit 浏览器资产
+- [x] Vanilla PWA 接入 `AgoraVoiceAI` 转录事件与 `/transcripts` 落库
+- [x] 修正 Agora toolkit `uid=0` 的本地用户转录角色归一化
+- [x] 增加 `AGORA_AREA` 配置，避免硬编码 quickstart 的 `Area.US`
+- [x] 增加脱敏语音联调环境诊断脚本，固化 Supabase/Agora DNS 检查
+- [x] 验证本机 Clash 代理路径；确认代理不足以恢复 Supabase/Agora 区域联调
+- [ ] 对 Supabase 执行 `0006_add_voice_session_support.sql`（当前连接串/网络阻塞）
+- [ ] 使用 quickstart Agora 凭证跑完整本地 voice start/stop 控制面联调（当前 US 区域 TLS 阻塞，CN 区域返回 token/区域不匹配）
+- [x] 浏览器验证 SDK 资产静态加载、语音入口错误处理和可用路径
+- **Status:** partial; blocked only on external DB/Agora region connectivity
+
+## Decisions Made
+| Decision | Rationale |
+|----------|-----------|
+| 先并入 Vercel FastAPI | Agora start/stop 是短 HTTP 控制面调用；状态外部化后不需要长驻 Python 服务 |
+| Cloudflare 不跑 Python voice backend | Workers Python/FastAPI 兼容性和 SDK 调试风险高，现阶段只做代理 |
+| 扩展现有表而非新建 voice 表 | 历史、复盘、统计链路天然统一 |
+| 前端不引入 Next/React | 主项目 PWA 已稳定，Agora RTC 可通过浏览器 SDK 接入 |
+| RTC SDK 接缝先落地，SDK 资产后续接入 | 避免本轮引入构建体系，同时让控制面和 UI 可先验收 |
+| 浏览器 Agora 资产直接复用 quickstart 已验证版本 | 避免闭门造车，同时不引入 Next/React 构建体系 |
+| `AGORA_AREA` 外置配置，默认仍为 `US` | quickstart 原本硬编码 US；本地网络仅 CN 区域可达，但生产应按 Agora 项目区域配置 |
+
+## Verification
+| Check | Result |
+|-------|--------|
+| `pytest backend/tests -q` | 41 passed, 2 skipped |
+| `node scripts/check_voice_pwa_contract.js` | PASS |
+| `bash scripts/pwa_smoke_check.sh` | PASS |
+| OpenAPI YAML parse | PASS |
+| local preflight with remote checks skipped | PASS |
+| Playwright browser smoke | PASS |
+| `pytest backend/tests -q` after SDK compatibility fixes | 43 passed, 2 skipped |
+| `PATH=.venv/bin:$PATH ... release_preflight.sh` | PASS |

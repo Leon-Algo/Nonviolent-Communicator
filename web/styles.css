@@ -252,6 +252,104 @@ select:focus {
   gap: 8px;
 }
 
+.practice-mode-switch {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 10px 0;
+  border: 2px solid var(--line);
+  background: #f3f7f5;
+}
+
+.practice-mode-switch .mode-option {
+  border: 0;
+  border-right: 2px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  min-width: 96px;
+}
+
+.practice-mode-switch .mode-option:last-child {
+  border-right: 0;
+}
+
+.practice-mode-switch .mode-option.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.voice-practice-block {
+  border: 2px solid var(--line);
+  background: #f4faf7;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.voice-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.voice-status-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.voice-status-text {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.voice-meta-grid {
+  display: grid;
+  gap: 4px;
+  min-width: min(320px, 100%);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.voice-transcript-list {
+  margin-top: 10px;
+  border: 2px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  min-height: 68px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.voice-transcript-item {
+  border: 1px solid #d4dde6;
+  background: #f9fbfd;
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.voice-transcript-head {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.voice-transcript-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
 .journey-track {
   display: flex;
   flex-wrap: wrap;
@@ -743,6 +841,10 @@ pre {
   .panel-title-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .voice-status-row {
+    flex-direction: column;
   }
 
   .install-guide-card {

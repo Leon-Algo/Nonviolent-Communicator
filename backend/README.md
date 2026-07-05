@@ -99,6 +99,9 @@ Authorization: Bearer mock_8a4c3f2a-2f88-4c74-9bc0-3123d26df302
 - `POST /api/v1/sessions/{session_id}/messages`
 - `POST /api/v1/sessions/{session_id}/rewrite`
 - `POST /api/v1/sessions/{session_id}/summary`
+- `POST /api/v1/voice/sessions`
+- `POST /api/v1/voice/sessions/{session_id}/stop`
+- `POST /api/v1/voice/sessions/{session_id}/transcripts`
 - `POST /api/v1/reflections`
 - `GET /api/v1/progress/weekly`
 - `GET /health`
@@ -133,6 +136,21 @@ Run in order:
 3. `db/migrations/0003_sync_auth_users_to_public_users.sql`
 4. `db/migrations/0004_enable_rls_core_tables.sql`
 5. `db/migrations/0005_fix_request_user_id_claim_resolution.sql`
+6. `db/migrations/0006_add_voice_session_support.sql`
+
+## Agora Voice Agent Configuration
+
+Voice practice uses the existing FastAPI deployment as a stateless control plane. Configure these variables when enabling `/api/v1/voice/*`:
+
+```bash
+AGORA_APP_ID=...
+AGORA_APP_CERTIFICATE=...
+AGORA_AREA=US  # US, EU, AP, or CN
+AGENT_GREETING="你好！我是小和，你的非暴力沟通语音教练。今天想练习什么场景呢？"
+```
+
+The backend persists `agent_id`, `channel_name`, RTC UIDs, status, and expiry in Supabase. It must not depend on process memory to stop an agent.
+Set `AGORA_AREA` to the Agora project/control-plane region. The default remains `US` to match the original quickstart; local China-network smoke tests may need `CN`.
 
 ## Next Implementation Steps
 

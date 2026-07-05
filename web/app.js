@@ -118,6 +118,24 @@ const state = {
   pendingPracticeAction: null,
 };
 
+const voiceState = {
+  mode: "text",
+  sessionId: "",
+  channelName: "",
+  agentId: "",
+  uid: "",
+  agentUid: "",
+  expiresAt: "",
+  connecting: false,
+  connected: false,
+  rtcClient: null,
+  rtmClient: null,
+  aiClient: null,
+  micTrack: null,
+  transcript: [],
+  syncedTranscriptKeys: new Set(),
+};
+
 function isAuthReady() {
   const mode = byId("authMode")?.value || "supabase";
   if (mode === "mock") {
@@ -879,6 +897,8 @@ function updateActionAvailability() {
   const exportSummaryImageBtn = byId("exportSummaryImageBtn");
   const copyShareTemplateBtn = byId("copyShareTemplateBtn");
   const downloadShareTemplateBtn = byId("downloadShareTemplateBtn");
+  const voiceStartBtn = byId("voiceStartBtn");
+  const voiceStopBtn = byId("voiceStopBtn");
 
   if (sendMessageBtn) sendMessageBtn.disabled = !hasSession;
   if (continuePracticeBtn) continuePracticeBtn.disabled = !hasSession;
@@ -891,6 +911,8 @@ function updateActionAvailability() {
   if (exportSummaryImageBtn) exportSummaryImageBtn.disabled = !hasSummary;
   if (copyShareTemplateBtn) copyShareTemplateBtn.disabled = !hasSummary;
   if (downloadShareTemplateBtn) downloadShareTemplateBtn.disabled = !hasSummary;
+  if (voiceStartBtn) voiceStartBtn.disabled = !authDone || voiceState.connecting || Boolean(voiceState.sessionId);
+  if (voiceStopBtn) voiceStopBtn.disabled = voiceState.connecting || !voiceState.sessionId;
 }
 
 function refreshOnboardingJourney() {
@@ -1241,6 +1263,31 @@ async function createSession(config, sceneId) {
     method: "POST",
     headers: authHeaders(config),
     body: JSON.stringify({ scene_id: sceneId, target_turns: targetTurns }),
+  });
+}
+
+async function createVoiceSession(config, sceneId) {
+  const targetTurns = Number(byId("targetTurns").value || 6);
+  return callApi(`${config.apiBaseUrl}/api/v1/voice/sessions`, {
+    method: "POST",
+    headers: authHeaders(config),
+    body: JSON.stringify({ scene_id: sceneId, target_turns: targetTurns }),
+  });
+}
+
+async function stopVoiceSession(config, sessionId) {
+  return callApi(`${config.apiBaseUrl}/api/v1/voice/sessions/${sessionId}/stop`, {
+    method: "POST",
+    headers: authHeaders(config),
+    body: JSON.stringify({}),
+  });
+}
+
+async function syncVoiceTranscriptTurns(config, sessionId, turns) {
+  return callApi(`${config.apiBaseUrl}/api/v1/voice/sessions/${sessionId}/transcripts`, {
+    method: "POST",
+    headers: authHeaders(config),
+    body: JSON.stringify({ turns }),
   });
 }
 
@@ -2131,6 +2178,383 @@ function syncOutcomeState() {
   }
 }
 
+function renderVoiceState() {
+  const statusText = byId("voiceStatusText");
+  if (statusText) {
+    if (voiceState.connecting) {
+      statusText.textContent = "正在连接语音会话";
+    } else if (voiceState.connected) {
+      statusText.textContent = "语音已连接，可以开始说话";
+    } else if (voiceState.sessionId) {
+      statusText.textContent = "语音会话已创建";
+    } else {
+      statusText.textContent = "未开始";
+    }
+  }
+
+  const channelValue = byId("voiceChannelValue");
+  const agentValue = byId("voiceAgentValue");
+  const startBtn = byId("voiceStartBtn");
+  const stopBtn = byId("voiceStopBtn");
+  const authDone = isAuthReady();
+
+  if (channelValue) channelValue.textContent = voiceState.channelName || "-";
+  if (agentValue) agentValue.textContent = voiceState.agentId || "-";
+  if (startBtn) startBtn.disabled = !authDone || voiceState.connecting || Boolean(voiceState.sessionId);
+  if (stopBtn) stopBtn.disabled = voiceState.connecting || !voiceState.sessionId;
+}
+
+async function loadAgoraAgentToolkit() {
+  if (window.NvcAgoraAgentToolkit) return window.NvcAgoraAgentToolkit;
+  const toolkit = await import("./vendor/agora/agora-agent-client-toolkit/index.mjs");
+  window.NvcAgoraAgentToolkit = toolkit;
+  return toolkit;
+}
+
+function waitForRtmConnected(rtmClient, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (timer) window.clearTimeout(timer);
+      rtmClient.removeEventListener?.("status", onStatus);
+      resolve();
+    };
+
+    const onStatus = (event) => {
+      const nextState = event?.newState || event?.state;
+      if (nextState === "CONNECTED") {
+        finish();
+      }
+    };
+
+    rtmClient.addEventListener?.("status", onStatus);
+    timer = window.setTimeout(finish, timeoutMs);
+  });
+}
+
+function normalizeTranscriptText(value) {
+  return String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isTranscriptFinal(item, toolkit) {
+  const status = String(item?.status || "").toLowerCase();
+  const inProgress = String(toolkit?.TurnStatus?.IN_PROGRESS || "in_progress").toLowerCase();
+  return Boolean(item?.text) && status !== inProgress && status !== "in_progress";
+}
+
+function mapTranscriptRole(item) {
+  const uid = String(item?.uid || "");
+  return uid === "0" || uid === String(voiceState.uid) ? "USER" : "ASSISTANT";
+}
+
+function renderVoiceTranscript() {
+  const container = byId("voiceTranscriptList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const items = voiceState.transcript.filter((item) => normalizeTranscriptText(item?.text));
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "语音转录会在对话开始后显示。";
+    container.appendChild(empty);
+    return;
+  }
+
+  items.slice(-20).forEach((item) => {
+    const role = mapTranscriptRole(item);
+    const card = document.createElement("article");
+    card.className = "voice-transcript-item";
+
+    const head = document.createElement("p");
+    head.className = "voice-transcript-head";
+    head.textContent = role === "USER" ? "你" : "小和";
+
+    const text = document.createElement("p");
+    text.className = "voice-transcript-text";
+    text.textContent = normalizeTranscriptText(item.text);
+
+    card.appendChild(head);
+    card.appendChild(text);
+    container.appendChild(card);
+  });
+}
+
+async function syncCompletedVoiceTranscript(config, toolkit) {
+  if (!voiceState.sessionId) return;
+  const turns = [];
+  const syncedKeys = [];
+
+  voiceState.transcript.forEach((item) => {
+    if (!isTranscriptFinal(item, toolkit)) return;
+    const role = mapTranscriptRole(item);
+    const turnId = String(item.turn_id || item.turnId || item._time || crypto.randomUUID());
+    const externalTurnId = `${turnId}-${role}`;
+    if (voiceState.syncedTranscriptKeys.has(externalTurnId)) return;
+    const content = normalizeTranscriptText(item.text);
+    if (!content) return;
+    syncedKeys.push(externalTurnId);
+    turns.push({
+      role,
+      content,
+      external_turn_id: externalTurnId,
+      metadata: {
+        uid: String(item.uid || ""),
+        status: String(item.status || ""),
+        timestamp: item._time || item.timestamp || null,
+      },
+    });
+  });
+
+  if (!turns.length) return;
+  const result = await syncVoiceTranscriptTurns(config, voiceState.sessionId, turns);
+  syncedKeys.forEach((key) => voiceState.syncedTranscriptKeys.add(key));
+  state.turn = result.current_turn;
+  updateRuntimeMeta();
+  updateStepState();
+  fetchSessionHistoryList({ silent: true }).catch(() => {});
+}
+
+function setPracticeMode(mode) {
+  const normalized = mode === "voice" ? "voice" : "text";
+  voiceState.mode = normalized;
+
+  const textBlock = byId("textPracticeBlock");
+  const voiceBlock = byId("voicePracticeBlock");
+  const textBtn = byId("practiceModeTextBtn");
+  const voiceBtn = byId("practiceModeVoiceBtn");
+
+  if (textBlock) textBlock.classList.toggle("is-hidden", normalized !== "text");
+  if (voiceBlock) voiceBlock.classList.toggle("is-hidden", normalized !== "voice");
+  if (textBtn) textBtn.classList.toggle("is-active", normalized === "text");
+  if (voiceBtn) voiceBtn.classList.toggle("is-active", normalized === "voice");
+
+  renderVoiceState();
+}
+
+async function initializeVoiceClient(voiceConfig) {
+  if (!window.AgoraRTC) {
+    return {
+      connected: false,
+      reason: "agora_rtc_sdk_missing",
+    };
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return {
+      connected: false,
+      reason: "microphone_api_unavailable",
+    };
+  }
+
+  const toolkit = await loadAgoraAgentToolkit();
+  if (window.AgoraRTC.setParameter) {
+    try {
+      window.AgoraRTC.setParameter("ENABLE_AUDIO_PTS_METADATA", true);
+      window.AgoraRTC.setParameter("ENABLE_AUDIO_PTS", true);
+    } catch {
+      // Non-critical optimization for transcript timing metadata.
+    }
+  }
+
+  const client = window.AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+  let rtmClient = null;
+  if (window.AgoraRTM?.RTM) {
+    rtmClient = new window.AgoraRTM.RTM(voiceConfig.app_id, String(voiceConfig.uid));
+    await rtmClient.login({ token: voiceConfig.token });
+    await waitForRtmConnected(rtmClient);
+    await rtmClient.subscribe(voiceConfig.channel_name);
+  }
+
+  const micTrack = await window.AgoraRTC.createMicrophoneAudioTrack();
+  await client.join(
+    voiceConfig.app_id,
+    voiceConfig.channel_name,
+    voiceConfig.token,
+    Number(voiceConfig.uid)
+  );
+  await client.publish([micTrack]);
+
+  const ai = await toolkit.AgoraVoiceAI.init({
+    rtcEngine: client,
+    rtmConfig: rtmClient ? { rtmEngine: rtmClient } : undefined,
+    renderMode: toolkit.TranscriptHelperMode.TEXT,
+    enableLog: DEV_CONTEXT,
+  });
+  ai.on(toolkit.AgoraVoiceAIEvents.TRANSCRIPT_UPDATED, (transcript) => {
+    voiceState.transcript = Array.isArray(transcript) ? [...transcript] : [];
+    renderVoiceTranscript();
+    const config = getConfig({ requireAuthToken: true });
+    syncCompletedVoiceTranscript(config, toolkit).catch((error) => {
+      console.warn("Voice transcript sync failed:", error);
+    });
+  });
+  ai.on(toolkit.AgoraVoiceAIEvents.AGENT_STATE_CHANGED, (_agentUserId, event) => {
+    if (event?.state) {
+      const statusText = byId("voiceStatusText");
+      if (statusText && voiceState.connected) {
+        statusText.textContent = `语音已连接，小和 ${event.state}`;
+      }
+    }
+  });
+  ai.subscribeMessage(voiceConfig.channel_name);
+
+  voiceState.rtcClient = client;
+  voiceState.rtmClient = rtmClient;
+  voiceState.aiClient = ai;
+  voiceState.micTrack = micTrack;
+  voiceState.connected = true;
+  return { connected: true };
+}
+
+async function cleanupVoiceClient() {
+  if (voiceState.aiClient) {
+    try {
+      voiceState.aiClient.unsubscribe();
+      voiceState.aiClient.destroy();
+    } catch {
+      // Ignore toolkit teardown errors while leaving the voice session.
+    }
+  }
+
+  if (voiceState.micTrack) {
+    try {
+      voiceState.micTrack.close();
+    } catch {
+      // Browser cleanup should not block stopping the backend session.
+    }
+  }
+
+  if (voiceState.rtcClient) {
+    try {
+      await voiceState.rtcClient.leave();
+    } catch {
+      // Ignore client-side leave errors after the backend stop request.
+    }
+  }
+
+  if (voiceState.rtmClient) {
+    try {
+      await voiceState.rtmClient.logout();
+    } catch {
+      // RTM may already be disconnected.
+    }
+  }
+
+  voiceState.rtcClient = null;
+  voiceState.rtmClient = null;
+  voiceState.aiClient = null;
+  voiceState.micTrack = null;
+  voiceState.connected = false;
+}
+
+function resetVoiceState() {
+  voiceState.sessionId = "";
+  voiceState.channelName = "";
+  voiceState.agentId = "";
+  voiceState.uid = "";
+  voiceState.agentUid = "";
+  voiceState.expiresAt = "";
+  voiceState.connecting = false;
+  voiceState.connected = false;
+  voiceState.rtcClient = null;
+  voiceState.rtmClient = null;
+  voiceState.aiClient = null;
+  voiceState.micTrack = null;
+  voiceState.transcript = [];
+  voiceState.syncedTranscriptKeys = new Set();
+  renderVoiceTranscript();
+  renderVoiceState();
+}
+
+async function startVoicePractice() {
+  clearNotice();
+  if (!isAuthReady()) {
+    setNotice("请先登录，再开始语音对练。", "warning");
+    focusAuthPanel();
+    return;
+  }
+
+  voiceState.connecting = true;
+  renderVoiceState();
+  let config = null;
+
+  try {
+    config = getConfig({ requireAuthToken: true });
+    resetRuntimeState();
+    const sceneData = await createScene(config);
+    state.sceneId = sceneData.scene_id;
+
+    const voiceData = await createVoiceSession(config, state.sceneId);
+    state.sessionId = voiceData.session_id;
+    state.turn = 0;
+    state.selectedTurn = 0;
+    voiceState.sessionId = voiceData.session_id;
+    voiceState.channelName = voiceData.channel_name;
+    voiceState.agentId = voiceData.agent_id;
+    voiceState.uid = String(voiceData.uid || "");
+    voiceState.agentUid = String(voiceData.agent_uid || "");
+    voiceState.expiresAt = voiceData.expires_at || "";
+
+    const clientResult = await initializeVoiceClient(voiceData);
+    persistRuntimeState();
+    updateRuntimeMeta();
+    updateStepState();
+    renderVoiceState();
+    setOutput({ ...voiceData, rtc_client: clientResult });
+
+    if (clientResult.connected) {
+      setNotice("语音对练已开始。结束后可生成行动卡和复盘。", "success");
+    } else {
+      setNotice(
+        "语音会话已创建，但当前页面还未加载 Agora RTC SDK；请补充 SDK 资产后继续浏览器连麦验收。",
+        "warning"
+      );
+    }
+  } catch (error) {
+    if (config && voiceState.sessionId) {
+      await stopVoiceSession(config, voiceState.sessionId).catch(() => {});
+      await cleanupVoiceClient();
+      resetVoiceState();
+    }
+    throw error;
+  } finally {
+    voiceState.connecting = false;
+    renderVoiceState();
+  }
+}
+
+async function stopVoicePractice() {
+  clearNotice();
+  if (!voiceState.sessionId) {
+    setNotice("当前没有正在进行的语音会话。", "warning");
+    return;
+  }
+
+  voiceState.connecting = true;
+  renderVoiceState();
+
+  try {
+    const config = getConfig({ requireAuthToken: true });
+    const sessionId = voiceState.sessionId;
+    const result = await stopVoiceSession(config, sessionId);
+    await cleanupVoiceClient();
+    resetVoiceState();
+    setOutput(result);
+    setNotice("语音会话已结束，可到历史会话中回看并继续复盘。", "success");
+    fetchSessionHistoryList({ silent: true }).catch(() => {});
+  } finally {
+    voiceState.connecting = false;
+    renderVoiceState();
+  }
+}
+
 async function sendPracticeTurn({ createFresh = false } = {}) {
   clearNotice();
   const config = getConfig({ requireAuthToken: true });
@@ -2712,6 +3136,7 @@ function bind() {
   renderHistory();
   renderSummary();
   renderReflectionMeta();
+  setPracticeMode("text");
   byId("progressWeekStart").value = getCurrentWeekStart();
   syncOutcomeState();
   applyReflectionToForm(state.reflection);
@@ -2725,6 +3150,10 @@ function bind() {
   byId("starterSoftBtn").addEventListener("click", () => applyMessageStarter("soft"));
   byId("starterDirectBtn").addEventListener("click", () => applyMessageStarter("direct"));
   byId("starterBoundaryBtn").addEventListener("click", () => applyMessageStarter("boundary"));
+  byId("practiceModeTextBtn").addEventListener("click", () => setPracticeMode("text"));
+  byId("practiceModeVoiceBtn").addEventListener("click", () => setPracticeMode("voice"));
+  byId("voiceStartBtn").addEventListener("click", () => startVoicePractice().catch(showError));
+  byId("voiceStopBtn").addEventListener("click", () => stopVoicePractice().catch(showError));
   byId("usedInRealWorld").addEventListener("change", syncOutcomeState);
   byId("installAppBtn").addEventListener("click", () =>
     promptPwaInstall()

@@ -46,7 +46,15 @@ async def get_session_owned_by_user(db: AsyncSession, session_id: UUID, user_id:
     result = await db.execute(
         text(
             """
-            SELECT s.id, s.user_id, s.scene_id, s.state, s.target_turns, s.current_turn
+            SELECT
+              s.id,
+              s.user_id,
+              s.scene_id,
+              s.state,
+              s.modality,
+              s.target_turns,
+              s.current_turn,
+              s.voice_agent_id
             FROM sessions s
             WHERE s.id = :session_id AND s.user_id = :user_id
             LIMIT 1
