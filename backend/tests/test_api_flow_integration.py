@@ -20,8 +20,11 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 MIGRATIONS = [
     ROOT_DIR / "db" / "migrations" / "0001_init_nvc_practice.sql",
     ROOT_DIR / "db" / "migrations" / "0002_add_idempotency_keys.sql",
+    # 0003 installs Supabase auth trigger glue and expects the managed auth schema.
+    # Local DB integration tests create public test users through application code instead.
     ROOT_DIR / "db" / "migrations" / "0004_enable_rls_core_tables.sql",
     ROOT_DIR / "db" / "migrations" / "0005_fix_request_user_id_claim_resolution.sql",
+    ROOT_DIR / "db" / "migrations" / "0006_add_voice_session_support.sql",
 ]
 TABLES_TO_TRUNCATE = [
     "idempotency_keys",

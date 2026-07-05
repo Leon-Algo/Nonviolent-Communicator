@@ -48,10 +48,22 @@
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
 - `CF_PAGES_PROJECT_NAME`
+- `AGORA_APP_ID`（启用语音对练时必需）
+- `AGORA_APP_CERTIFICATE`（启用语音对练时必需）
+- `AGORA_AREA`（可选，`US`/`EU`/`AP`/`CN`，默认 `US`）
+- `AGENT_GREETING`（可选，语音 Agent 开场白）
 
 可选（Pages Functions 代理目标）:
 
 - `API_PROXY_ORIGIN`（默认 `https://nvc-practice-api.vercel.app`）
+
+语音联调环境诊断:
+
+```bash
+python scripts/check_voice_integration_env.py
+```
+
+该脚本只输出变量是否存在、目标 host 和 DNS 解析结果，不打印密钥。若在独立 worktree 中运行，需要先加载主项目 `.env` 和 quickstart 的 `server/.env.local`。
 
 ### 2.3 Cloudflare 一次性准备清单
 
@@ -73,6 +85,7 @@
 3. `db/migrations/0003_sync_auth_users_to_public_users.sql`
 4. `db/migrations/0004_enable_rls_core_tables.sql`
 5. `db/migrations/0005_fix_request_user_id_claim_resolution.sql`
+6. `db/migrations/0006_add_voice_session_support.sql`
 
 ## 4. 本地运行
 
@@ -194,6 +207,8 @@ bash scripts/cloudflare_pages_release.sh deploy nonviolent-communicator main web
 ```bash
 bash scripts/pwa_smoke_check.sh
 ```
+
+该检查会同时执行 `node scripts/check_voice_pwa_contract.js`，确认语音模式 DOM、前端 API 路径和 JS 入口没有被误删。
 
 ## 6. 迁移排障标准流程（必须按顺序）
 

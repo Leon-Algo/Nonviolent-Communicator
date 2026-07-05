@@ -214,24 +214,54 @@
           <textarea id="sceneContext" rows="3">这个需求已经两次延期，影响发布节奏。</textarea>
         </label>
 
-        <label>
-          你的发言
-          <textarea id="messageContent" rows="3">你们总是拖延，根本不专业。</textarea>
-        </label>
-        <p class="meta compact-meta">不会开场时可先用“我观察到...我感到...我希望...”句式。</p>
-        <p class="meta compact-meta">
-          可以先填写场景和发言。若尚未登录，点击“创建场景并发送第 1 轮”时会先引导登录，成功后自动继续。
-        </p>
-        <div class="actions message-starter-row">
-          <button id="starterSoftBtn" type="button" class="tone-ghost">和缓开场</button>
-          <button id="starterDirectBtn" type="button" class="tone-ghost">直接表达</button>
-          <button id="starterBoundaryBtn" type="button" class="tone-ghost">边界表达</button>
+        <div class="practice-mode-switch" role="group" aria-label="练习模式">
+          <button id="practiceModeTextBtn" type="button" class="mode-option is-active">文字对练</button>
+          <button id="practiceModeVoiceBtn" type="button" class="mode-option">语音对练</button>
         </div>
 
-        <div class="actions">
-          <button id="startPracticeBtn" type="button">创建场景并发送第 1 轮</button>
-          <button id="sendMessageBtn" type="button">发送下一轮（第 2 轮起）</button>
-          <button id="newSessionBtn" type="button" class="tone-ghost">重置并开始新会话</button>
+        <div id="textPracticeBlock">
+          <label>
+            你的发言
+            <textarea id="messageContent" rows="3">你们总是拖延，根本不专业。</textarea>
+          </label>
+          <p class="meta compact-meta">不会开场时可先用“我观察到...我感到...我希望...”句式。</p>
+          <p class="meta compact-meta">
+            可以先填写场景和发言。若尚未登录，点击“创建场景并发送第 1 轮”时会先引导登录，成功后自动继续。
+          </p>
+          <div class="actions message-starter-row">
+            <button id="starterSoftBtn" type="button" class="tone-ghost">和缓开场</button>
+            <button id="starterDirectBtn" type="button" class="tone-ghost">直接表达</button>
+            <button id="starterBoundaryBtn" type="button" class="tone-ghost">边界表达</button>
+          </div>
+
+          <div class="actions">
+            <button id="startPracticeBtn" type="button">创建场景并发送第 1 轮</button>
+            <button id="sendMessageBtn" type="button">发送下一轮（第 2 轮起）</button>
+            <button id="newSessionBtn" type="button" class="tone-ghost">重置并开始新会话</button>
+          </div>
+        </div>
+
+        <div id="voicePracticeBlock" class="voice-practice-block is-hidden">
+          <div class="voice-status-row">
+            <div>
+              <p class="voice-status-label">语音状态</p>
+              <p id="voiceStatusText" class="voice-status-text">未开始</p>
+            </div>
+            <div class="voice-meta-grid">
+              <span>channel: <code id="voiceChannelValue">-</code></span>
+              <span>agent: <code id="voiceAgentValue">-</code></span>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="voiceStartBtn" type="button">开始语音对练</button>
+            <button id="voiceStopBtn" type="button" class="tone-ghost" disabled>结束语音对练</button>
+          </div>
+          <p class="meta compact-meta">
+            语音会话会复用当前场景与目标轮数，结束后进入同一套历史和复盘流程。
+          </p>
+          <div id="voiceTranscriptList" class="voice-transcript-list" aria-live="polite">
+            <p class="empty">语音转录会在对话开始后显示。</p>
+          </div>
         </div>
       </section>
 
@@ -460,6 +490,8 @@
       </section>
     </main>
 
+    <script src="./vendor/agora/agora-rtc-sdk-ng/AgoraRTC_N-production.js"></script>
+    <script src="./vendor/agora/agora-rtm/agora-rtm.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

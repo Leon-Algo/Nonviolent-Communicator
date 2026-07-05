@@ -14,6 +14,7 @@ tags:
   - name: system
   - name: scenes
   - name: sessions
+  - name: voice
   - name: reflections
   - name: progress
 paths:
@@ -249,6 +250,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SummaryCreateResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /voice/sessions:
+    post:
+      tags: [voice]
+      operationId: startVoiceSession
+      summary: Start an Agora voice practice session from an existing scene
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceSessionStartRequest'
+      responses:
+        '201':
+          description: Voice session started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionStartResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /voice/sessions/{session_id}/stop:
+    post:
+      tags: [voice]
+      operationId: stopVoiceSession
+      summary: Stop a voice practice session by persisted Agora agent id
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Voice session stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionStopResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /voice/sessions/{session_id}/transcripts:
+    post:
+      tags: [voice]
+      operationId: syncVoiceTranscripts
+      summary: Persist stable voice transcript turns and generate OFNR feedback
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceTranscriptSyncRequest'
+      responses:
+        '200':
+          description: Transcript turns synced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceTranscriptSyncResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
@@ -501,6 +580,9 @@ components:
     SessionState:
       type: string
       enum: [ACTIVE, COMPLETED, ABANDONED]
+    SessionModality:
+      type: string
+      enum: [TEXT, VOICE]
     OfnrStatus:
       type: string
       enum: [MISSING, WEAK, GOOD]
@@ -603,6 +685,7 @@ components:
         - scene_id
         - scene_title
         - state
+        - modality
         - current_turn
         - target_turns
         - created_at
@@ -619,6 +702,9 @@ components:
           type: string
         state:
           $ref: '#/components/schemas/SessionState'
+        modality:
+          $ref: '#/components/schemas/SessionModality'
+          default: TEXT
         current_turn:
           type: integer
           minimum: 0
@@ -743,6 +829,7 @@ components:
         - session_id
         - scene
         - state
+        - modality
         - current_turn
         - target_turns
         - created_at
@@ -755,6 +842,9 @@ components:
           $ref: '#/components/schemas/SessionHistoryScene'
         state:
           $ref: '#/components/schemas/SessionState'
+        modality:
+          $ref: '#/components/schemas/SessionModality'
+          default: TEXT
         current_turn:
           type: integer
           minimum: 0
@@ -900,6 +990,108 @@ components:
         created_at:
           type: string
           format: date-time
+    VoiceSessionStartRequest:
+      type: object
+      additionalProperties: false
+      required: [scene_id]
+      properties:
+        scene_id:
+          type: string
+          format: uuid
+        target_turns:
+          type: integer
+          minimum: 5
+          maximum: 8
+          default: 6
+    VoiceSessionStartResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+        - app_id
+        - token
+        - uid
+        - channel_name
+        - agent_uid
+        - agent_id
+        - expires_at
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        app_id:
+          type: string
+        token:
+          type: string
+        uid:
+          type: string
+        channel_name:
+          type: string
+        agent_uid:
+          type: string
+        agent_id:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    VoiceSessionStopResponse:
+      type: object
+      additionalProperties: false
+      required: [session_id, status]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [STOPPED]
+    VoiceTranscriptTurn:
+      type: object
+      additionalProperties: false
+      required: [role, content, external_turn_id]
+      properties:
+        role:
+          type: string
+          enum: [USER, ASSISTANT]
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        external_turn_id:
+          type: string
+          minLength: 1
+          maxLength: 120
+        metadata:
+          type: object
+          additionalProperties: true
+          default: {}
+    VoiceTranscriptSyncRequest:
+      type: object
+      additionalProperties: false
+      required: [turns]
+      properties:
+        turns:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/VoiceTranscriptTurn'
+    VoiceTranscriptSyncResponse:
+      type: object
+      additionalProperties: false
+      required: [session_id, inserted_count, current_turn, state]
+      properties:
+        session_id:
+          type: string
+          format: uuid
+        inserted_count:
+          type: integer
+          minimum: 0
+        current_turn:
+          type: integer
+          minimum: 0
+        state:
+          $ref: '#/components/schemas/SessionState'
     ReflectionCreateRequest:
       type: object
       additionalProperties: false

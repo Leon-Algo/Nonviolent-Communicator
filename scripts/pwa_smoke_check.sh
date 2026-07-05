@@ -22,6 +22,8 @@ for path in "${required_files[@]}"; do
 done
 
 node --check web/sw.js
+node --check web/app.js
+node scripts/check_voice_pwa_contract.js
 
 python3 - <<'PY'
 import json

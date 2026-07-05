@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     anthropic_base_url: str = Field(
         default="https://api-inference.modelscope.cn", alias="ANTHROPIC_BASE_URL"
     )
+    agora_app_id: str | None = Field(default=None, alias="AGORA_APP_ID")
+    agora_app_certificate: str | None = Field(default=None, alias="AGORA_APP_CERTIFICATE")
+    agora_area: str = Field(default="US", alias="AGORA_AREA")
+    agent_greeting: str = Field(
+        default="你好！我是小和，你的非暴力沟通语音教练。今天想练习什么场景呢？",
+        alias="AGENT_GREETING",
+    )
     cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
     cors_origin_regex: str = Field(
         default=r"https://.*\.(vercel\.app|pages\.dev)", alias="CORS_ORIGIN_REGEX"
@@ -77,6 +84,10 @@ class Settings(BaseSettings):
         "llm_model",
         "openai_base_url",
         "anthropic_base_url",
+        "agora_app_id",
+        "agora_app_certificate",
+        "agora_area",
+        "agent_greeting",
         "cors_origins",
         "cors_origin_regex",
         mode="before",
@@ -95,6 +106,16 @@ class Settings(BaseSettings):
         normalized = value.strip().lower()
         if normalized not in {"mock", "supabase"}:
             return "mock"
+        return normalized
+
+    @field_validator("agora_area", mode="before")
+    @classmethod
+    def normalize_agora_area(cls, value):
+        if not isinstance(value, str):
+            return "US"
+        normalized = value.strip().upper()
+        if normalized not in {"US", "EU", "AP", "CN"}:
+            return "US"
         return normalized
 
     @field_validator("slow_request_ms", mode="before")
