@@ -1,4 +1,4 @@
-const DEFAULT_PROXY_ORIGIN = "https://nvc-practice-api.vercel.app";
+const DEFAULT_PROXY_ORIGIN = "https://api.leoalgo.site";
 
 function resolveProxyOrigin(env) {
   const raw = String(env?.API_PROXY_ORIGIN || DEFAULT_PROXY_ORIGIN).trim();
