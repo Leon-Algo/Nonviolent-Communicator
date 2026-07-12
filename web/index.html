@@ -97,7 +97,7 @@
         </div>
       </section>
 
-      <section id="authPanel" class="panel">
+      <section id="authPanel" class="panel panel--secondary">
         <div class="panel-title-row">
           <h2>Step 1. 注册 / 登录</h2>
           <p class="badge">当前模式: <code id="currentAuthMode">supabase</code></p>
@@ -141,38 +141,45 @@
         <p id="noticeBar" class="notice is-hidden"></p>
       </section>
 
-      <section id="quickCheckPanel" class="panel">
-        <div class="panel-title-row">
-          <h2>连接自检（快速）</h2>
-          <button id="runQuickCheckBtn" type="button" class="tone-ghost">运行自检</button>
-        </div>
-        <p id="quickCheckSummary" class="meta quick-check-summary is-idle">
-          用于快速定位“网页能打开但功能异常”的问题。
-        </p>
-        <ul class="quick-check-list">
-          <li>
-            <span>静态资源</span>
-            <code id="quickCheckStatic" class="quick-check-badge is-idle">未执行</code>
-          </li>
-          <li>
-            <span>后端代理</span>
-            <code id="quickCheckBackend" class="quick-check-badge is-idle">未执行</code>
-          </li>
-          <li>
-            <span>业务 API</span>
-            <code id="quickCheckApi" class="quick-check-badge is-idle">未执行</code>
-          </li>
-          <li>
-            <span>登录状态</span>
-            <code id="quickCheckAuth" class="quick-check-badge is-idle">未执行</code>
-          </li>
-        </ul>
-        <p class="meta compact-meta">
-          若“后端代理”失败，请先直接打开 <code>/health-backend</code> 查看是否返回 JSON。
-        </p>
+      <section id="quickCheckPanel" class="panel panel--secondary panel--collapsible">
+        <details id="quickCheckDetails" class="collapsible-panel">
+          <summary class="collapsible-summary">
+            <span class="collapsible-title">连接自检（快速）</span>
+            <span class="collapsible-hint">仅在遇到“能打开但功能异常”时展开</span>
+          </summary>
+          <div class="collapsible-body">
+            <div class="actions">
+              <button id="runQuickCheckBtn" type="button" class="tone-ghost">运行自检</button>
+            </div>
+            <p id="quickCheckSummary" class="meta quick-check-summary is-idle">
+              用于快速定位“网页能打开但功能异常”的问题。
+            </p>
+            <ul class="quick-check-list">
+              <li>
+                <span>静态资源</span>
+                <code id="quickCheckStatic" class="quick-check-badge is-idle">未执行</code>
+              </li>
+              <li>
+                <span>后端代理</span>
+                <code id="quickCheckBackend" class="quick-check-badge is-idle">未执行</code>
+              </li>
+              <li>
+                <span>业务 API</span>
+                <code id="quickCheckApi" class="quick-check-badge is-idle">未执行</code>
+              </li>
+              <li>
+                <span>登录状态</span>
+                <code id="quickCheckAuth" class="quick-check-badge is-idle">未执行</code>
+              </li>
+            </ul>
+            <p class="meta compact-meta">
+              若“后端代理”失败，请先直接打开 <code>/health-backend</code> 查看是否返回 JSON。
+            </p>
+          </div>
+        </details>
       </section>
 
-      <section id="practicePanel" class="panel">
+      <section id="practicePanel" class="panel panel--primary">
         <div class="panel-title-row">
           <h2>Step 2. 开始对练</h2>
           <div class="runtime-meta">
@@ -310,7 +317,7 @@
         </div>
       </section>
 
-      <section id="historyPanel" class="panel">
+      <section id="historyPanel" class="panel panel--secondary">
         <div class="panel-title-row">
           <h2>历史会话列表（跨会话回看）</h2>
           <div class="actions">

@@ -3034,6 +3034,7 @@ async function runQuickConnectivityCheck() {
     if (failures === 0 && warnings === 0) {
       setQuickCheckSummary("自检通过：页面、代理、API 全部正常。", "pass");
       setNotice("连接自检通过。", "success");
+      dismissQuickCheckAlert();
       return;
     }
     if (failures === 0) {
@@ -3049,6 +3050,19 @@ async function runQuickConnectivityCheck() {
   }
 }
 
+function expandQuickCheckPanel({ alert = false } = {}) {
+  const el = byId("quickCheckDetails");
+  if (!el) return;
+  el.open = true;
+  if (alert) el.classList.add("is-alert");
+  else el.classList.remove("is-alert");
+}
+
+function dismissQuickCheckAlert() {
+  const el = byId("quickCheckDetails");
+  if (el) el.classList.remove("is-alert");
+}
+
 function showError(err) {
   const msg = String(err?.message || err);
   const details = getErrorDetails(err);
@@ -3056,6 +3070,7 @@ function showError(err) {
 
   if (details.isNetworkError) {
     setNotice("网络连接异常，当前无法连接服务。请先检查网络后重试。", "warning");
+    expandQuickCheckPanel({ alert: true });
     setOutput({
       error: msg,
       category: "network",
@@ -3066,6 +3081,7 @@ function showError(err) {
 
   if (details.errorCode.toUpperCase() === "UPSTREAM_UNAVAILABLE" || details.status === 502) {
     setNotice("后端代理暂时不可用，请稍后重试。", "warning");
+    expandQuickCheckPanel({ alert: true });
     setOutput({
       error: msg,
       category: "proxy_unavailable",
@@ -3105,6 +3121,7 @@ function showError(err) {
 
   if (details.status >= 500) {
     setNotice("服务端暂时异常，请稍后重试。", "error");
+    expandQuickCheckPanel({ alert: true });
     setOutput({ error: msg, category: "server_error", request_id: details.requestId || undefined });
     return;
   }

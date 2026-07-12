@@ -852,3 +852,138 @@ pre {
     box-shadow: 5px 5px 0 rgba(18, 34, 47, 0.58);
   }
 }
+
+
+/* ---------------------------------------------------------
+ * UX3 视觉层级强化 & UX4 失败态可恢复（2026-07-12）
+ * 通过 CSS 层实现"练习优先"，不重排 DOM
+ * ------------------------------------------------------- */
+
+/* 主内容面板：更强的视觉存在感 */
+.panel--primary {
+  border-width: 3px;
+  box-shadow: 10px 10px 0 var(--line);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.panel--primary h2 {
+  color: var(--accent);
+}
+
+/* 主 CTA：放大、加粗，成为首屏最重的按钮 */
+#practicePanel #startPracticeBtn,
+#practicePanel #voiceStartBtn {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 22px;
+  letter-spacing: 0.02em;
+  box-shadow: 4px 4px 0 var(--line);
+}
+
+#practicePanel #startPracticeBtn:hover,
+#practicePanel #voiceStartBtn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 var(--line);
+}
+
+/* 次级面板：视觉降权（灰阶、更薄的边框、更淡的阴影） */
+.panel--secondary {
+  opacity: 0.94;
+  border-width: 1px;
+  border-color: rgba(31, 53, 72, 0.4);
+  box-shadow: 4px 4px 0 rgba(31, 53, 72, 0.35);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.panel--secondary h2 {
+  font-size: 20px;
+  color: var(--muted);
+}
+
+.panel--secondary:hover,
+.panel--secondary:focus-within {
+  opacity: 1;
+  box-shadow: 6px 6px 0 var(--line);
+}
+
+/* 开发者面板视觉进一步弱化 */
+[data-dev-only] {
+  opacity: 0.72;
+  filter: saturate(0.85);
+}
+
+[data-dev-only]:hover {
+  opacity: 1;
+  filter: none;
+}
+
+/* -------- UX4: 可折叠自检面板 -------- */
+.panel--collapsible {
+  padding: 0;
+}
+
+.collapsible-panel {
+  padding: 12px 18px;
+}
+
+.collapsible-panel[open] {
+  padding: 18px 22px;
+  background: rgba(255, 250, 240, 0.85);
+}
+
+.collapsible-summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  padding: 6px 0;
+}
+
+.collapsible-summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.15s ease;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.collapsible-panel[open] > .collapsible-summary::before {
+  transform: rotate(90deg);
+}
+
+.collapsible-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  flex: 1;
+}
+
+.collapsible-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.collapsible-body {
+  margin-top: 12px;
+  animation: rise 0.25s ease both;
+}
+
+/* 失败态自动展开时的高亮效果 */
+.collapsible-panel.is-alert {
+  border: 2px solid var(--warn);
+  background: #fff5e7;
+  animation: rise 0.35s ease both;
+}
+
+.collapsible-panel.is-alert > .collapsible-summary .collapsible-hint {
+  color: var(--warn);
+  font-weight: 700;
+}
