@@ -105,6 +105,30 @@ When changing API routing strategy, update ALL three: `web/app.js`, `functions/a
 
 When changing SW cache strategy: bump `SW_VERSION`, document whether `app.js` is cached, run PWA smoke test.
 
+## Critical Rules (from 2026-07-12 auth outage)
+
+> Root cause: `web/app.js` hardcoded `DEFAULT_SUPABASE_URL` to a non-existent project (`wiafjgjfdrajlxnlkray`, DNS NXDOMAIN) since commit 498e4fc, while `.env`/backend used the real project (`sggtwlnluvvhtgsiritg`). Auth was broken in production from launch and went undetected because go-live verification ran curl/JWT via the backend and never exercised a real browser signup.
+
+### `.env` is the single source of truth for config
+- All project config (Supabase URL/keys, Agora, LLM, Vercel, Cloudflare, Volcengine) lives in root `.env`.
+- Frontend defaults in `web/app.js` (`DEFAULT_SUPABASE_URL`, `DEFAULT_SUPABASE_ANON_KEY`) MUST stay aligned with `.env`. Changing one without the other = outage. State the alignment explicitly in the commit message.
+- Real Supabase project ref: `sggtwlnluvvhtgsiritg` (`.env` `SUPABASE_URL`; backend `DATABASE_URL`). Frontend, backend, and `.env` must all reference the same project.
+- `.env` holds secrets (service-role key, DB password, platform tokens) — never commit, never paste into chat/logs. The anon key is public and may live in the frontend.
+
+### Auth vs data take different network paths
+- **Auth (signup/login)**: the browser hits Supabase DIRECTLY (`${SUPABASE_URL}/auth/v1/*`), NOT the same-origin proxy. So `SUPABASE_URL` must be a real project the browser can reach.
+- **Data API**: browser → same-origin `/api/*` (CF Pages Function) → `api.leoalgo.site` (Vercel) → Supabase/Agora.
+- Email confirmation is ON: a fresh signup cannot log in until the confirmation email link is clicked. To unblock E2E testing, confirm the user via admin API with `.env` `SUPABASE_SERVICE_ROLE_KEY` (never expose this key).
+
+### Verification must include a real browser E2E pass
+- For auth/routing/config changes, verify in a real browser: home → signup → login → create scene → send → (voice start/stop). Any network/JS error = not release-ready.
+- curl + JWT / backend-contract passing ≠ releasable. Config-class bugs (wrong endpoint, wrong project, wrong key) only surface through the real user path.
+- Run `scripts/release_preflight.sh` + `scripts/pwa_smoke_check.sh` before release (they include `node --check web/app.js`, PWA contract check, manifest validation).
+
+### Supabase ops gotchas
+- Free-tier projects auto-PAUSE after ~7 days of inactivity → the next signup fails. Add a daily DB keepalive or upgrade the tier.
+- Deleting `auth.users` does NOT cascade into the public schema. To remove a user's data, delete child tables first in FK order (see `db/migrations/0001`: messages/feedback_items/rewrites/summaries → sessions → scenes → users).
+
 ## CI
 
 - `backend-tests.yml`: runs `pytest backend/tests -q` on push/PR to main (Python 3.12, Postgres 16 service container)
