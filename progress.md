@@ -192,16 +192,20 @@
 | `node --check web/app.js` | PASS |
 | `node scripts/check_voice_pwa_contract.js` | PASS |
 
-### 2026-07-12 追加：修复 web/app.js 隐藏 SyntaxError
+### 2026-07-12 追加（订正）：前端 Supabase 配置指向不存在的项目（真因）
 
-- **发现**：本次 UX 收官阶段跑 `node --check web/app.js` 时暴露一处**存在于 commit e6b7ade 中的孤儿代码**：文件末尾 `bind();` 之后挂了半截 `=== "mock" || hasToken) { ... } bind();`，缺失前两行 `const mode = ...` / `if (mode` 开头。整个 `app.js` 无法通过 JS 引擎解析。
-- **影响**：浏览器加载 `app.js` 时抛 SyntaxError，脚本全量失败。7-12 15:29 的品牌域名验收全部走 curl+JWT 直接打后端 API，**未从浏览器 UI 完整走一遍交互**，所以该 bug 隐藏至今。
-- **修复**：删除末尾孤儿代码块（10 行 + 1 个重复 `bind();`），并追加 `expandQuickCheckPanel` / `dismissQuickCheckAlert` 两个 helper 与失败态自动展开逻辑。
-- **验证**：`node --check web/app.js` 通过；`node scripts/check_voice_pwa_contract.js` 通过。
+> 订正：上一版此处写的"修复 app.js 隐藏 SyntaxError（e6b7ade 末尾孤儿代码）"经复核**不成立**——`git show e6b7ade:web/app.js` 跑 `node --check` 本身就通过，末尾只有一个 `bind();`，无孤儿块、无重复 `bind()`、无 SyntaxError。该描述系误诊，已撤回。真实事件如下。
 
-### 验收方法教训（新增）
+- **真因（showstopper）**：`web/app.js` 的 `DEFAULT_SUPABASE_URL` 自 commit 498e4fc 起硬编码为 `https://wiafjgjfdrajlxnlkray.supabase.co`——该 project ref **不存在**（DNS NXDOMAIN）。真实项目是 `sggtwlnluvvhtgsiritg`（`.env` 的 `SUPABASE_URL`、后端 `DATABASE_URL` 都用它），前端配套的 anon key 也属于那个幻影项目。后果：前端注册/登录直连一个不存在的主机，**auth 从上线起就是坏的**。
+- **为何 go-live 没抓到**：7-12 go-live 的 JWT 验证全走脚本/后端（curl + service role / 后端拿 token），**从未在浏览器里走一次真实 signup → login**，所以"前端指向错误项目"的 bug 一直没暴露。这比"漏抓 SyntaxError"更值得记：**绕过真实用户路径的验收，会让任何只影响浏览器入口的 bug 全部漏网**。
+- **修复**（commit 46b4a73）：`DEFAULT_SUPABASE_URL` 与 `DEFAULT_SUPABASE_ANON_KEY` 改为真实项目 `sggtwlnluvvhtgsiritg` 的值（取自 `.env`，anon key 为公开密钥，RLS 负责数据隔离）。app.js 走 network-first（不被 SW 缓存），修复部署后对所有用户即时生效。
+- **浏览器端到端验证**（MaC-cc，真实 Chrome + 真实 Supabase）：signup 成功建用户 → 登录拿到 `role=authenticated` 的 JWT → 创建场景 → NVC 教练回复（OFNR 反馈）全链路通，0 控制台报错；语音 start 到达"正在连接"且 session 创建无报错，仅卡在 CDP 自动化无法授予 mic 权限（测试环境限制，非产品问题，go-live 已验真实 start/stop）。
+- **附带发现**：① 项目**开启了邮箱确认**——注册后须收确认邮件点链接才能登录（真实用户有邮箱可走通；国内邮箱收 Supabase 邮件可能有投递摩擦，待产品决策）。② `auth.users` 残留 2 个历史测试账号（`final_verify_*@test.com` / `deploy_test_*@test.com`），非本次产生，已确认无 public 业务数据，未擅自清理。
+
+### 验收方法教训（订正版）
 | Lesson | Rationale |
 |--------|-----------|
-| API 层验收 ≠ 上线就绪 | curl + JWT 通过只能证明后端契约成立，无法发现前端 JS SyntaxError 这类"浏览器加载即挂"的 bug |
-| 上线前**必须跑一次完整 `release_preflight.sh`** | preflight 里已经有 `node --check web/app.js`（scripts/release_preflight.sh:37）和 `pwa_smoke_check.sh` 里的 `node --check web/app.js`（scripts/pwa_smoke_check.sh:26）；本次孤儿代码就是因为验收链路绕过了 preflight，直接跳到 curl API 冒烟，才把 SyntaxError 送上线 |
-| 上线验收必须包含"浏览器完整交互"这一环 | 至少覆盖：打开首页 → 登录 → 创建场景 → 发送 → 语音开始/停止，任何环节 JS 报错都直接判为不通过 |
+| 上线验收必须走"真实用户路径"，不能只用 curl/JWT | 本次 root cause 是前端指向不存在的 Supabase 项目；curl+JWT 只验后端契约，永远碰不到"浏览器 signup"这条路径，bug 才会从 7-5 一路活到 7-12 |
+| 浏览器 E2E 至少覆盖：首页加载 → 注册/登录 → 建场景 → 发送 → 语音 start/stop | 任何环节网络/JS 报错都判不通过；本次正是补跑这条才发现真因 |
+| 上线前跑 `release_preflight.sh` + `pwa_smoke_check.sh` | 含 `node --check`、合约检查、manifest 校验——能兜住语法/资源类问题（但兜不住"指向错误项目"这种配置类问题，后者只能靠真实交互验收） |
+| 关键配置改动要确认缓存投递策略 | 本次 app.js 走 network-first 无需 bump SW；但若改的是被 SW 缓存的资产（style/font/image），必须 bump `SW_VERSION` 否则旧客户端拿不到 |
