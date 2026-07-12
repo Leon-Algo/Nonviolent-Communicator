@@ -2,8 +2,8 @@ function byId(id) {
   return document.getElementById(id);
 }
 
-const DEFAULT_SUPABASE_URL = "https://wiafjgjfdrajlxnlkray.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_EvEX2Hlp9e7SU4FcbpIrzQ_uusY6M87";
+const DEFAULT_SUPABASE_URL = "https://sggtwlnluvvhtgsiritg.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNnZ3R3bG5sdXZ2aHRnc2lyaXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMzI4ODEsImV4cCI6MjA5ODcwODg4MX0.2n39sEOI17qA0GAyNqBYyNT5eQPoqHqVOniMIMKy9w8";
 const DEFAULT_API_BASE_URL = "";
 const QUICK_CHECK_ENDPOINTS = {
   ping: "/ping.txt",
