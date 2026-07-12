@@ -184,3 +184,47 @@
 2. 完成“先输入后登录”链路，减少首轮阻断
 3. 次级模块统一折叠/抽屉化（登录、自检、引导、历史、复盘）
 4. 在不影响稳定性的前提下继续优化新手体验与转化
+
+### 2026-07-12（追加：Agora 语音上线 + 品牌域名闭环）
+
+关键进展:
+
+1. Agora ConvoAI v2 真实 start/stop 全链路打通（agent_id=A46AR98KF98TV33CC58FR34DV87AV26E）
+2. 上一 session 遗留的 Supabase pooler 连接与 Agora 区域 TLS 两个 external blocker 全部解除
+3. 品牌域名 `api.leoalgo.site` 上线（Volcengine DNS CNAME + Vercel SSL 签发生效）
+4. 前端同源 `/api/*` 代理切换到品牌域名，脱离直连 vercel.app
+5. 修复 datetime 编码 bug 并追加回归断言，新增至 45 passed
+6. Service Worker 滚动到 v11，清理旧缓存
+7. 全链路真实用户路径验收通过：`前端 pages.dev → 品牌域名 → 后端 → Supabase(pooler+RLS) → Agora ConvoAI`
+8. 上线后清理测试数据（scenes=0, users=0）
+
+验证方法（沉淀最佳实践）:
+
+1. 不再接受"health/契约通过就上线"的弱验收
+2. 上线验收统一采用"真实 Supabase JWT + 从前端品牌域名发起"的真实用户路径
+3. 覆盖 DNS/SSL/前端代理/后端服务四个层次同时成立
+
+上线基线:
+
+1. 代码: main（commit e6b7ade），含 datetime 回归测试
+2. 后端服务域名: `https://api.leoalgo.site`
+3. 前端主域名: `https://nonviolent-communicator.pages.dev`
+4. DB: Supabase `nvc-mentor`，pooler IPv4，RLS 隔离生效
+5. 语音: Agora ConvoAI v2，DB 持久化正确
+6. 回归保护: 45 tests passed
+
+结论: M5 收官，无遗留功能阻塞，语音链路上线就绪。
+
+### 2026-07-12（追加：Phase A-4 UX 收官）
+
+关键进展:
+
+1. **UX4 失败态可恢复**已落地：`quickCheckPanel` 由常驻面板改为 `<details>` 折叠，`showError` 在失败时自动展开自检入口
+2. **UX3 视觉层级强化**已落地：主 CTA 按钮放大、主输入区高对比；次级面板通过 `.panel--secondary` 灰阶降权
+3. 采取"最小侵入"策略：不重排 DOM，只通过 CSS + `<details>` 折叠实现"练习优先"目标；如需更彻底的 IA 改造，可后续对齐 `web/ui-practice-focus-draft.html` 草稿
+
+下一阶段重点建议:
+
+1. 语音体验产品化打磨（转录 UI 流式渲染、掉线恢复、麦克风权限引导）
+2. Agora 用量/成本可观测（每日会话数、总时长、异常终止率）
+3. 语音复盘视图与文字复盘的统一/分化决策

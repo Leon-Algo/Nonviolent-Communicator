@@ -129,10 +129,13 @@ Phase 8 in progress
 - [x] 增加 `AGORA_AREA` 配置，避免硬编码 quickstart 的 `Area.US`
 - [x] 增加脱敏语音联调环境诊断脚本，固化 Supabase/Agora DNS 检查
 - [x] 验证本机 Clash 代理路径；确认代理不足以恢复 Supabase/Agora 区域联调
-- [ ] 对 Supabase 执行 `0006_add_voice_session_support.sql`（当前连接串/网络阻塞）
-- [ ] 使用 quickstart Agora 凭证跑完整本地 voice start/stop 控制面联调（当前 US 区域 TLS 阻塞，CN 区域返回 token/区域不匹配）
+- [x] 对 Supabase 执行 `0006_add_voice_session_support.sql`（2026-07-12 通过品牌域名闭环反向验证 voice session 持久化正确）
+- [x] 使用真实 Agora 凭证跑完整线上 voice start/stop 控制面联调（2026-07-12，agent_id=A46AR98KF98TV33CC58FR34DV87AV26E）
 - [x] 浏览器验证 SDK 资产静态加载、语音入口错误处理和可用路径
-- **Status:** partial; blocked only on external DB/Agora region connectivity
+- [x] 修复 datetime 编码 bug 并追加回归断言（45 tests passed）
+- [x] 品牌域名 `api.leoalgo.site` SSL 签发 + Volcengine DNS CNAME + 前端同源代理切换到品牌域名
+- [x] 全链路真实用户路径验收：`nonviolent-communicator.pages.dev → 品牌域名 → Vercel 后端 → Supabase(pooler+RLS) → Agora ConvoAI`
+- **Status:** complete（2026-07-12 品牌域名全链路闭环验收通过，上线就绪）
 
 ## Decisions Made
 | Decision | Rationale |
@@ -156,3 +159,7 @@ Phase 8 in progress
 | Playwright browser smoke | PASS |
 | `pytest backend/tests -q` after SDK compatibility fixes | 43 passed, 2 skipped |
 | `PATH=.venv/bin:$PATH ... release_preflight.sh` | PASS |
+| `pytest backend/tests -q`（含 datetime 回归断言，2026-07-12） | 45 passed |
+| 品牌域名全链路真实用户路径闭环（前端 pages.dev → api.leoalgo.site → Vercel → Supabase + Agora，2026-07-12） | PASS |
+| Agora ConvoAI 真实 start/stop（agent_id=A46AR98KF98TV33CC58FR34DV87AV26E，2026-07-12） | PASS |
+| 测试数据清理（scenes=0, users=0，2026-07-12） | PASS |

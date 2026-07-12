@@ -91,3 +91,33 @@
 - The main project `.env` also has `DATABASE_URL_5432`, but it still targets the Supabase pooler host instead of a true direct Postgres host.
 - Local Clash Verge is available on `127.0.0.1:7897`; it can proxy `https://api.agora.io/health`, but it does not restore TLS connectivity to Supabase or Agora regional API hosts from this runtime.
 - Forcing Python through SOCKS5 with `PySocks` does not change the outcome: Supabase REST still fails TLS, `asyncpg` against the pooler still reports tenant/sni issues, and direct `db.<project>.supabase.co` still drops the connection.
+
+---
+
+## 2026-07-12 Go-Live Findings（Agora 语音品牌域名闭环）
+
+### Integration Findings
+- 上一 session 遗留的两个 external blocker 都是"连接层"问题，不是产品/代码问题；一旦网络路径打通即可无缝落地
+- Supabase pooler + RLS 的正确配置组合是 `DATABASE_URL` 走 pooler IPv4；直连 `db.<project>.supabase.co` 因 SNI/tenant 问题反而不稳
+- Agora ConvoAI 区域配置只要与 Agora 项目区域一致就能跑通；`AGORA_AREA` 外置化在这次证明是必需的抽象
+- 品牌域名比 vercel.app 直连是**更强的验收路径**，能同时覆盖 DNS/SSL/前端代理/后端服务四个层次；未来所有验收都应以"真实用户路径"为准
+
+### Verification Findings
+- 45 passed（新增 datetime 回归断言），比上轮 43 多 2，回归保护更完整
+- 全链路验收方法沉淀：真实 Supabase JWT + 从前端域名发起 → 走品牌域名同源代理 → 后端 → DB + 语音；不再接受"health/契约通过就上线"的弱验收
+
+### 下一阶段 Findings（产品化打磨方向）
+- M5 收官后，语音相关的技术风险已消解，剩余投资回报最高的方向是"用户可感知的语音体验"：
+  - 实时转录 UI 的呈现（当前只落库，未做流式渲染优化）
+  - 语音会话中断、超时、掉线的自动恢复策略
+  - 语音会话的复盘视图与文字复盘链路的统一/分化决策
+  - 移动端麦克风权限引导（首次开麦的权限拒绝失败率是主要流失点）
+- Agora 是按分钟计费，需要建立用量/成本可观测：至少能看到当日会话数、总时长、异常终止率
+- Phase A-4 UX3/UX4 采取"最小侵入"策略：不重排 DOM，只通过 CSS 视觉降权 + `<details>` 折叠实现"练习优先"目标；如果后续要更彻底的信息架构改造，再走完整的 UX 迭代（对齐 `web/ui-practice-focus-draft.html` 草稿）
+
+### Technical Decisions（本轮追加）
+| Decision | Rationale |
+|----------|-----------|
+| UX4 不引入新的自检入口，只把现有 `quickCheckPanel` 折叠 | 现有 `showError` 已完整分类到 network/proxy/auth/server/offline，UX 层只需减少常驻噪音 |
+| UX3 不做 DOM 重排，只做 CSS 层视觉降权 | DOM 重排风险高、需回归大量交互测试；视觉降权可以先验证信息架构是否奏效 |
+| Planning 文件与代码进度对齐 | 之前 planning 停留在 7-5 的"blocked"状态，会误导后续 session；对齐后再讨论下一步 |

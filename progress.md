@@ -132,3 +132,76 @@
 | Supabase pooler returned `tenant/user ... not found` for the configured `DATABASE_URL` | 2 | Tried direct `db.<project>.supabase.co:5432` with same password; connection closed before auth. Treat real DB migration as blocked by connection configuration/network until a valid direct DB URL or pooler config is provided |
 | Agora quickstart hard-coded `Area.US`; local network cannot complete TLS to US/EU/AP Agora regional domains | 1 | Added `AGORA_AREA` config so region is deploy/runtime configurable |
 | `AGORA_AREA=CN` reaches Agora ConvoAI API but returns `401 Invalid token` with the current quickstart credentials | 1 | Confirms SDK request path and region config work; full start/stop requires matching Agora project region or network access to the credential's region |
+
+---
+
+## Session: 2026-07-12 Agora Voice Go-Live 品牌域名闭环
+
+### Overall Status
+- **Status:** complete；语音全链路上线就绪
+- 承接上一 session 遗留的两个 external blocker（Supabase pooler 连接、Agora 区域 TLS）在本轮全部解除
+
+### Actions Taken
+- 修复 datetime 编码 bug 并追加回归断言，避免语音会话时间字段序列化再次出错
+- Supabase `nvc-mentor` pooler + RLS 生效，`0006_add_voice_session_support.sql` 反向确认已应用（voice session 持久化正确）
+- Agora ConvoAI v2 真实 start/stop 打通（agent_id=A46AR98KF98TV33CC58FR34DV87AV26E）
+- 品牌域名 `api.leoalgo.site` 上线：Volcengine DNS CNAME 到 Vercel + SSL 签发生效
+- 前端 `nonviolent-communicator.pages.dev` 同源 `/api/*` 代理切换到品牌域名（脱离直连 vercel.app）
+- 前端 Service Worker 滚动到 v11，清理旧缓存
+- 全链路真实用户路径验收：真实 Supabase JWT → 前端 pages.dev → 同源代理 → 品牌域名 → 后端 → Supabase + Agora
+- 上线后清理测试数据：scenes=0, users=0
+
+### Test Results
+| Test | Status |
+|------|--------|
+| `pytest backend/tests -q`（含 datetime 回归） | PASS: 45 passed |
+| 建测试用户 + 密码登录拿 JWT | PASS: role=authenticated |
+| `POST /api/v1/scenes`（经前端代理） | PASS: 201 |
+| `POST /api/v1/voice/sessions`（经前端代理） | PASS: 201，真实 agent_id 返回 |
+| `POST /api/v1/voice/sessions/{id}/stop` | PASS: 200 STOPPED |
+| 测试数据清理 | PASS: scenes=0, users=0 |
+
+### 上线基线（2026-07-12 截止）
+| 维度 | 状态 |
+|------|------|
+| 代码 | main（commit e6b7ade），含 datetime 修复 + 回归测试 |
+| 后端 | `https://api.leoalgo.site`（Vercel），`/health` 200，SSL 有效 |
+| 前端 | `https://nonviolent-communicator.pages.dev`，SW v11 |
+| 自定义域名 | Volcengine DNS + Vercel SSL，全链路品牌域名 |
+| DB | Supabase `nvc-mentor`，pooler IPv4，RLS 隔离生效 |
+| 语音 | Agora ConvoAI v2 真实 start/stop，DB 持久化正确 |
+| 回归保护 | 45 tests passed（含 datetime 回归断言） |
+
+### Residual Risks
+- 无功能阻塞，M5 收官
+- 后续风险转移到"产品体验层"：语音掉线恢复、转录 UI、麦克风权限引导、Agora 用量/成本可观测
+
+## Session: 2026-07-12（追加）Phase A-4 UX 收官
+
+### Overall Status
+- **Status:** complete；UX3/UX4 落地
+
+### Actions Taken
+- **UX4 失败态可恢复**：将 `quickCheckPanel` 由常驻面板改为 `<details>` 折叠，默认收起；`showError` 在 network / proxy_unavailable / server_error 等类别下自动展开自检面板，命中"仅在失败时暴露自检入口"最佳实践
+- **UX3 视觉层级强化**：CSS 层新增 `.panel--secondary` 灰阶降权样式（authPanel、historyPanel、开发者配置等），主 CTA `#startPracticeBtn` / `#voiceStartBtn` 按钮尺寸和视觉重量放大，主输入区（`practicePanel`）背景保持高对比
+- 保持 DOM 顺序不动，仅通过 CSS + `<details>` 折叠实现视觉降权，避免影响事件绑定与既有测试
+
+### Test Results
+| Test | Status |
+|------|--------|
+| `node --check web/app.js` | PASS |
+| `node scripts/check_voice_pwa_contract.js` | PASS |
+
+### 2026-07-12 追加：修复 web/app.js 隐藏 SyntaxError
+
+- **发现**：本次 UX 收官阶段跑 `node --check web/app.js` 时暴露一处**存在于 commit e6b7ade 中的孤儿代码**：文件末尾 `bind();` 之后挂了半截 `=== "mock" || hasToken) { ... } bind();`，缺失前两行 `const mode = ...` / `if (mode` 开头。整个 `app.js` 无法通过 JS 引擎解析。
+- **影响**：浏览器加载 `app.js` 时抛 SyntaxError，脚本全量失败。7-12 15:29 的品牌域名验收全部走 curl+JWT 直接打后端 API，**未从浏览器 UI 完整走一遍交互**，所以该 bug 隐藏至今。
+- **修复**：删除末尾孤儿代码块（10 行 + 1 个重复 `bind();`），并追加 `expandQuickCheckPanel` / `dismissQuickCheckAlert` 两个 helper 与失败态自动展开逻辑。
+- **验证**：`node --check web/app.js` 通过；`node scripts/check_voice_pwa_contract.js` 通过。
+
+### 验收方法教训（新增）
+| Lesson | Rationale |
+|--------|-----------|
+| API 层验收 ≠ 上线就绪 | curl + JWT 通过只能证明后端契约成立，无法发现前端 JS SyntaxError 这类"浏览器加载即挂"的 bug |
+| 上线前**必须跑一次完整 `release_preflight.sh`** | preflight 里已经有 `node --check web/app.js`（scripts/release_preflight.sh:37）和 `pwa_smoke_check.sh` 里的 `node --check web/app.js`（scripts/pwa_smoke_check.sh:26）；本次孤儿代码就是因为验收链路绕过了 preflight，直接跳到 curl API 冒烟，才把 SyntaxError 送上线 |
+| 上线验收必须包含"浏览器完整交互"这一环 | 至少覆盖：打开首页 → 登录 → 创建场景 → 发送 → 语音开始/停止，任何环节 JS 报错都直接判为不通过 |
