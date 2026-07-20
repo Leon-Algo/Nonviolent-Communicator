@@ -5,3 +5,12 @@ __pycache__/
 .venv/
 .env
 backend/.env
+
+# Node
+node_modules/
+
+# Env backups (may contain secrets — e.g. .env.bak.1783179113)
+.env.bak*
+
+# Agora local CLI config (machine-specific, from absorbed agent-quickstart-python)
+.agora/
