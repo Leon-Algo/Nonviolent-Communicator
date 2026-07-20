@@ -1,12 +1,12 @@
 {
-  "name": "NVC Practice Coach",
-  "short_name": "NVC Coach",
-  "description": "非暴力沟通练习应用，支持场景对练、行动卡与复盘。",
+  "name": "橘晴 · 好好说话练习器",
+  "short_name": "橘晴",
+  "description": "吵架前，先跟 AI 练一遍怎么好好说话。非暴力沟通场景对练、行动卡与复盘。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f8f7f2",
-  "theme_color": "#1f7a64",
+  "background_color": "#fff8f0",
+  "theme_color": "#e8834a",
   "icons": [
     {
       "src": "/icons/icon-192.png",

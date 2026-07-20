@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NVC Practice Coach</title>
-    <meta name="theme-color" content="#1f7a64" />
+    <title>橘晴 · 好好说话练习器</title>
+    <meta name="theme-color" content="#e8834a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="./manifest.webmanifest" />
@@ -19,8 +19,10 @@
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body data-flow-page="home">
     <div class="grain"></div>
+
+    <!-- 安装引导浮层（原有逻辑，未改动） -->
     <div id="installGuideOverlay" class="install-guide-overlay is-hidden">
       <section class="install-guide-card" role="dialog" aria-modal="true" aria-label="安装应用引导">
         <div class="install-guide-head">
@@ -37,73 +39,481 @@
         </ol>
       </section>
     </div>
-    <main class="shell">
-      <header class="hero">
-        <p class="eyebrow">NVC Practice Coach</p>
-        <h1>三步完成一次<br />非暴力沟通练习</h1>
-        <p class="sub">第一次使用建议按“安装（可选）-> 注册登录 -> 对练 -> 行动卡”顺序完成。</p>
-        <p class="hero-note">首次体验通常 3-5 分钟可完成。</p>
-        <p class="pwa-meta">PWA 状态: <code id="pwaModeValue">初始化中</code></p>
-        <p id="pwaNetworkBar" class="pwa-network-bar is-hidden"></p>
-        <div class="actions pwa-top-actions">
-          <button id="installAppBtn" type="button" class="tone-ghost is-hidden">安装应用</button>
-          <button id="updateAppBtn" type="button" class="tone-ghost is-hidden">更新版本</button>
-          <button id="showJourneyBtn" type="button" class="tone-ghost is-hidden">显示新手引导</button>
-        </div>
-      </header>
 
-      <ol class="stepper" aria-label="练习步骤">
+    <!-- 离线/网络提示细条（原有逻辑） -->
+    <p id="pwaNetworkBar" class="pwa-network-bar flow-network-strip is-hidden"></p>
+
+    <!-- 全局壳：品牌 + 三点进度 + PWA 动作 -->
+    <header class="flow-header">
+      <div class="flow-brand">橘晴<small>好好说话练习器</small></div>
+      <ol class="stepper" aria-label="练习进度">
         <li id="stepAuth" class="step is-active">
           <span class="step-index">1</span>
           <div>
-            <strong>登录账号</strong>
-            <p>获取 Supabase Token</p>
+            <strong>登录</strong>
+            <p>账号</p>
           </div>
         </li>
         <li id="stepPractice" class="step">
           <span class="step-index">2</span>
           <div>
-            <strong>开始对练</strong>
-            <p>创建场景并发送消息</p>
+            <strong>对练</strong>
+            <p>练习</p>
           </div>
         </li>
         <li id="stepReview" class="step">
           <span class="step-index">3</span>
           <div>
-            <strong>总结复盘</strong>
-            <p>行动卡与周进度</p>
+            <strong>复盘</strong>
+            <p>收获</p>
           </div>
         </li>
       </ol>
+      <div class="flow-pwa-actions">
+        <button id="installAppBtn" type="button" class="tone-ghost is-hidden">安装</button>
+        <button id="updateAppBtn" type="button" class="tone-ghost is-hidden">更新</button>
+        <button id="showJourneyBtn" type="button" class="tone-ghost is-hidden">引导</button>
+      </div>
+    </header>
 
-      <section id="journeyPanel" class="panel journey-panel">
-        <div class="panel-title-row">
-          <h2>新手引导（首轮）</h2>
-          <p class="badge"><code id="journeyProgress">0/4</code></p>
-        </div>
-        <p id="journeyHint" class="meta">
-          先完成注册登录，再发送第 1 轮消息。安装应用是可选项，可以先跳过。
-        </p>
-        <div class="journey-track">
-          <span id="journeyStepInstall" class="journey-pill">1. 安装（可选）</span>
-          <span id="journeyStepAuth" class="journey-pill">2. 注册/登录</span>
-          <span id="journeyStepPractice" class="journey-pill">3. 发送第 1 轮</span>
-          <span id="journeyStepReview" class="journey-pill">4. 生成行动卡</span>
-        </div>
-        <div class="actions">
-          <button id="journeyPrimaryBtn" type="button">下一步</button>
-          <button id="journeySkipInstallBtn" type="button" class="tone-ghost">安装先跳过</button>
-          <button id="dismissJourneyBtn" type="button" class="tone-ghost">隐藏引导</button>
+    <main class="flow-shell">
+      <!-- ============ 视图 1 · 首页 ============ -->
+      <section class="flow-page" id="pageHome" data-page="home">
+        <div class="flow-stagger">
+          <div class="home-hero" id="homeHeroWelcome">
+            <span class="home-orb home-orb-a"></span>
+            <span class="home-orb home-orb-b"></span>
+            <p class="eyebrow">橘晴 · 非暴力沟通练习</p>
+            <h1 class="home-title">吵架前，<br />先在这里练一遍</h1>
+            <p class="home-sub">
+              把那句不好说出口的话，先试着说给 AI 听。它会扮演对方，陪你练到能好好开口。
+            </p>
+          </div>
+          <div class="home-compact is-hidden" id="homeHeroCompact">
+            <h1 class="home-title">欢迎回来</h1>
+            <p class="home-sub">今天想练哪一段对话？</p>
+          </div>
+
+          <div class="resume-card is-hidden" id="flowResumeCard">
+            <div>
+              <p class="resume-title" id="flowResumeTitle">上次的练习还没结束</p>
+              <p class="resume-meta" id="flowResumeMeta"></p>
+            </div>
+            <button id="flowResumeBtn" type="button">继续练习</button>
+          </div>
+
+          <section class="panel scene-card" id="sceneCard">
+            <h2>想练哪一段对话？</h2>
+            <p class="meta">选一个接近的场景，我们帮你把练习搭好。</p>
+            <div class="chips" role="group" aria-label="场景快捷选择">
+              <button type="button" class="chip" data-preset="peer_delay">和同事聊延期</button>
+              <button type="button" class="chip" data-preset="manager_alignment">
+                和上级对齐预期
+              </button>
+              <button type="button" class="chip" data-preset="cross_team_conflict">
+                跨团队矛盾
+              </button>
+              <button type="button" class="chip" data-preset="custom">其他（自己写）</button>
+            </div>
+            <label class="visually-hidden">
+              场景模板
+              <select id="templatePreset">
+                <option value="peer_delay">同事延期反馈</option>
+                <option value="manager_alignment">上级预期对齐</option>
+                <option value="cross_team_conflict">跨团队冲突协调</option>
+                <option value="custom">自定义</option>
+              </select>
+            </label>
+            <div class="grid">
+              <label>
+                给这次练习起个名字
+                <input id="sceneTitle" type="text" value="和同事沟通延期风险" />
+              </label>
+              <label>
+                这次想达成什么
+                <input id="sceneGoal" type="text" value="确认新的里程碑并明确责任" />
+              </label>
+            </div>
+            <details class="soft-details">
+              <summary>补充背景与设置（可选）</summary>
+              <div class="details-body">
+                <div class="grid">
+                  <label>
+                    背景
+                    <textarea id="sceneContext" rows="3">这个需求已经两次延期，影响发布节奏。</textarea>
+                  </label>
+                  <label>
+                    想练几轮（5-8 轮）
+                    <input id="targetTurns" type="number" min="5" max="8" value="6" />
+                  </label>
+                </div>
+              </div>
+            </details>
+            <div class="home-cta">
+              <button id="flowStartBtn" type="button">开始练习</button>
+              <p class="meta">不用注册，先填着。准备好说出第一句话时，才会请你登录。</p>
+            </div>
+          </section>
+
+          <details class="soft-details" id="homeHistoryDetails">
+            <summary>以前的练习</summary>
+            <div class="details-body">
+              <section id="historyPanel">
+                <div class="actions">
+                  <label class="inline-input">
+                    最近数量
+                    <input id="historyLimit" type="number" min="1" max="50" value="10" />
+                  </label>
+                  <label class="inline-input">
+                    状态
+                    <select id="historyState">
+                      <option value="">全部</option>
+                      <option value="ACTIVE">进行中</option>
+                      <option value="COMPLETED">已完成</option>
+                      <option value="ABANDONED">已中止</option>
+                    </select>
+                  </label>
+                  <label class="inline-input history-keyword">
+                    关键词
+                    <input id="historyKeyword" type="text" placeholder="标题/目标/消息" />
+                  </label>
+                </div>
+                <div class="actions history-filter-row">
+                  <label class="inline-input">
+                    开始日期
+                    <input id="historyCreatedFrom" type="date" />
+                  </label>
+                  <label class="inline-input">
+                    结束日期
+                    <input id="historyCreatedTo" type="date" />
+                  </label>
+                  <button id="refreshHistoryBtn" type="button" class="tone-ghost">应用筛选</button>
+                  <button id="resetHistoryFiltersBtn" type="button" class="tone-ghost">
+                    清空筛选
+                  </button>
+                </div>
+                <p id="historyFilterHint" class="meta">当前筛选: 全部</p>
+                <div class="history-pagination">
+                  <button id="historyPrevBtn" type="button" class="tone-ghost">上一页</button>
+                  <span id="historyPageMeta">第 1/1 页 · 共 0 条</span>
+                  <button id="historyNextBtn" type="button" class="tone-ghost">下一页</button>
+                </div>
+                <div id="historySessionList" class="history-session-list">
+                  <p class="empty">暂无历史会话，完成一次练习后这里会出现记录。</p>
+                </div>
+              </section>
+            </div>
+          </details>
+
+          <div class="home-login-entry">
+            <button id="flowLoginBtn" type="button" class="tone-ghost">
+              已有账号？登录同步练习记录
+            </button>
+          </div>
         </div>
       </section>
 
-      <section id="authPanel" class="panel panel--secondary">
-        <div class="panel-title-row">
-          <h2>Step 1. 注册 / 登录</h2>
-          <p class="badge">当前模式: <code id="currentAuthMode">supabase</code></p>
-        </div>
-        <p class="meta">新用户先注册，老用户直接登录即可。如果你刚才已填写练习内容，登录成功后会自动继续发送。</p>
+      <!-- ============ 视图 2 · 对练 ============ -->
+      <section class="flow-page" id="pagePractice" data-page="practice">
+        <div id="practicePanel">
+          <div class="practice-topbar">
+            <button id="flowBackHomeBtn" type="button" class="tone-ghost" aria-label="返回首页">
+              ←
+            </button>
+            <p class="practice-title" id="flowSceneMirror">练习</p>
+            <span class="practice-turns">
+              第 <code id="currentTurnValue">0</code>/<span id="flowTargetTurns">6</span> 轮
+            </span>
+            <button id="flowFinishBtn" type="button" class="tone-ghost">结束练习</button>
+          </div>
+          <span class="visually-hidden">
+            scene: <code id="sceneIdValue">-</code> session: <code id="sessionIdValue">-</code>
+          </span>
 
+          <div id="conversationList" class="conversation-list chat-scroll">
+            <p class="empty">还没有会话记录。</p>
+          </div>
+
+          <div class="feedback-strip">
+            <div class="strip-row">
+              <span class="strip-metric">本轮总分<strong id="feedbackOverall">-</strong></span>
+              <span class="strip-metric">风险<strong id="feedbackRisk">-</strong></span>
+            </div>
+            <p class="next-line">
+              <small>下一句可以试试</small>
+              <span id="nextSentence">-</span>
+            </p>
+            <details>
+              <summary>看看这句话的四步拆解（观察/感受/需要/请求）</summary>
+              <ul class="ofnr-list">
+                <li><b>O</b> <span id="ofnrObservation">-</span></li>
+                <li><b>F</b> <span id="ofnrFeeling">-</span></li>
+                <li><b>N</b> <span id="ofnrNeed">-</span></li>
+                <li><b>R</b> <span id="ofnrRequest">-</span></li>
+              </ul>
+              <p class="assistant-reply" id="assistantReply">
+                发送一条消息后，这里会显示对方回复。
+              </p>
+            </details>
+          </div>
+
+          <div class="input-dock">
+            <div class="dock-card">
+              <div id="textPracticeBlock">
+                <div class="dock-starters message-starter-row">
+                  <button id="starterSoftBtn" type="button" class="tone-ghost">和缓开场</button>
+                  <button id="starterDirectBtn" type="button" class="tone-ghost">直接表达</button>
+                  <button id="starterBoundaryBtn" type="button" class="tone-ghost">
+                    边界表达
+                  </button>
+                </div>
+                <div class="dock-input-row">
+                  <textarea id="messageContent" rows="2">你们总是拖延，根本不专业。</textarea>
+                  <button id="startPracticeBtn" type="button" class="dock-send-btn">发送</button>
+                  <button id="sendMessageBtn" type="button" class="dock-send-btn is-hidden">
+                    发送
+                  </button>
+                </div>
+              </div>
+
+              <div id="voicePracticeBlock" class="voice-practice-block is-hidden">
+                <div class="voice-orb" aria-hidden="true"></div>
+                <div class="voice-status-row">
+                  <div>
+                    <p class="voice-status-label">语音状态</p>
+                    <p id="voiceStatusText" class="voice-status-text">未开始</p>
+                  </div>
+                  <div class="voice-meta-grid visually-hidden">
+                    <span>channel: <code id="voiceChannelValue">-</code></span>
+                    <span>agent: <code id="voiceAgentValue">-</code></span>
+                  </div>
+                </div>
+                <div class="actions">
+                  <button id="voiceStartBtn" type="button">开始语音对练</button>
+                  <button id="voiceStopBtn" type="button" class="tone-ghost" disabled>
+                    结束语音对练
+                  </button>
+                </div>
+                <p class="meta compact-meta">
+                  语音会话会复用当前场景与目标轮数，结束后进入同一套历史和复盘流程。
+                </p>
+                <div id="voiceTranscriptList" class="voice-transcript-list" aria-live="polite">
+                  <p class="empty">语音转录会在对话开始后显示。</p>
+                </div>
+              </div>
+
+              <div class="dock-mode-row">
+                <div class="practice-mode-switch" role="group" aria-label="练习模式">
+                  <button id="practiceModeTextBtn" type="button" class="mode-option is-active">
+                    文字
+                  </button>
+                  <button id="practiceModeVoiceBtn" type="button" class="mode-option">语音</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <details class="soft-details">
+            <summary>更多操作</summary>
+            <div class="details-body">
+              <div class="actions">
+                <label class="inline-input">
+                  跳到轮次
+                  <select id="turnJumpSelect">
+                    <option value="">最新一轮</option>
+                  </select>
+                </label>
+                <button id="continuePracticeBtn" type="button" class="tone-ghost">
+                  继续当前会话
+                </button>
+                <button id="newSessionBtn" type="button" class="tone-ghost">
+                  重置并开始新会话
+                </button>
+              </div>
+            </div>
+          </details>
+
+          <details id="quickCheckDetails" class="soft-details">
+            <summary>连接出问题？点我自检</summary>
+            <div class="details-body">
+              <div class="actions">
+                <button id="runQuickCheckBtn" type="button" class="tone-ghost">运行自检</button>
+              </div>
+              <p id="quickCheckSummary" class="meta quick-check-summary is-idle">
+                用于快速定位“网页能打开但功能异常”的问题。
+              </p>
+              <ul class="quick-check-list">
+                <li>
+                  <span>静态资源</span>
+                  <code id="quickCheckStatic" class="quick-check-badge is-idle">未执行</code>
+                </li>
+                <li>
+                  <span>后端代理</span>
+                  <code id="quickCheckBackend" class="quick-check-badge is-idle">未执行</code>
+                </li>
+                <li>
+                  <span>业务 API</span>
+                  <code id="quickCheckApi" class="quick-check-badge is-idle">未执行</code>
+                </li>
+                <li>
+                  <span>登录状态</span>
+                  <code id="quickCheckAuth" class="quick-check-badge is-idle">未执行</code>
+                </li>
+                <li>
+                  <span>PWA 模式</span>
+                  <code id="pwaModeValue" class="quick-check-badge is-idle">初始化中</code>
+                </li>
+              </ul>
+              <p class="meta compact-meta">
+                若“后端代理”失败，请先直接打开 <code>/health-backend</code> 查看是否返回 JSON。
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- ============ 视图 3 · 复盘 ============ -->
+      <section class="flow-page" id="pageReview" data-page="review">
+        <div class="flow-stagger">
+          <div class="letter-card" id="flowLetterCard">
+            <span class="letter-tag">写给你的一封信</span>
+            <div id="flowLetterBody">
+              <p>完成一次练习后，这里会有一封写给你的信。</p>
+            </div>
+            <div class="actions letter-cta">
+              <button id="flowGotoCardBtn" type="button" class="tone-ghost">
+                往下看看行动卡 ↓
+              </button>
+            </div>
+          </div>
+
+          <section class="panel review-card" id="reviewPanel">
+            <div class="panel-title-row">
+              <h2>行动卡</h2>
+              <p class="meta" id="summaryMeta">尚未生成</p>
+            </div>
+            <div class="summary-grid">
+              <article class="summary-card">
+                <p><small>开场句</small><span id="summaryOpening" class="summary-value">-</span></p>
+                <p><small>请求句</small><span id="summaryRequest" class="summary-value">-</span></p>
+                <p><small>兜底句</small><span id="summaryFallback" class="summary-value">-</span></p>
+                <p><small>风险提醒</small><span id="summaryRisks" class="summary-value">-</span></p>
+                <div class="actions summary-actions">
+                  <button id="copySummaryBtn" type="button" class="tone-ghost">复制行动卡</button>
+                  <button id="exportSummaryBtn" type="button" class="tone-ghost">
+                    导出 Markdown
+                  </button>
+                  <button id="exportSummaryPdfBtn" type="button" class="tone-ghost">导出 PDF</button>
+                  <button id="exportSummaryImageBtn" type="button" class="tone-ghost">
+                    导出图片
+                  </button>
+                </div>
+                <details class="soft-details">
+                  <summary>分享给别人的文案模板</summary>
+                  <div class="details-body share-template-block">
+                    <label class="inline-input">
+                      分享模板
+                      <select id="shareTemplateType">
+                        <option value="peer">发给同事</option>
+                        <option value="manager">发给上级</option>
+                        <option value="self">复盘记录</option>
+                      </select>
+                    </label>
+                    <div class="actions summary-actions">
+                      <button id="copyShareTemplateBtn" type="button" class="tone-ghost">
+                        复制模板
+                      </button>
+                      <button id="downloadShareTemplateBtn" type="button" class="tone-ghost">
+                        导出模板
+                      </button>
+                    </div>
+                    <textarea
+                      id="shareTemplatePreview"
+                      rows="5"
+                      readonly
+                      placeholder="生成行动卡后，这里会出现可直接分享的文案模板。"
+                    ></textarea>
+                  </div>
+                </details>
+              </article>
+            </div>
+            <div class="actions">
+              <button id="generateSummaryBtn" type="button" class="tone-ghost">
+                重新生成行动卡
+              </button>
+            </div>
+          </section>
+
+          <details class="soft-details">
+            <summary>明天用过了，回来复盘一下</summary>
+            <div class="details-body">
+              <div class="grid two compact">
+                <label>
+                  是否已用于真实对话
+                  <select id="usedInRealWorld">
+                    <option value="true">是</option>
+                    <option value="false">否</option>
+                  </select>
+                </label>
+                <label>
+                  效果评分（1-5）
+                  <input id="outcomeScore" type="number" min="1" max="5" placeholder="可选" />
+                </label>
+              </div>
+              <label>
+                备注（可选）
+                <textarea id="blockerNote" rows="2" placeholder="本次对话最大的阻碍是什么？"></textarea>
+              </label>
+              <div class="actions">
+                <button id="submitReflectionBtn" type="button">提交复盘</button>
+              </div>
+              <p class="meta" id="reflectionMeta">尚未提交复盘</p>
+            </div>
+          </details>
+
+          <details class="soft-details">
+            <summary>看看本周进度</summary>
+            <div class="details-body">
+              <label>
+                从哪一天开始算
+                <input id="progressWeekStart" type="date" />
+              </label>
+              <div class="actions">
+                <button id="weeklyProgressBtn" type="button" class="tone-ghost">
+                  查看本周进度
+                </button>
+              </div>
+              <ul class="progress-list">
+                <li>练习次数 <strong id="progressPracticeCount">-</strong></li>
+                <li>总结次数 <strong id="progressSummaryCount">-</strong></li>
+                <li>真实应用 <strong id="progressRealCount">-</strong></li>
+                <li>平均得分 <strong id="progressOutcome">-</strong></li>
+              </ul>
+            </div>
+          </details>
+
+          <div class="review-again">
+            <button id="flowAgainBtn" type="button">再练一个场景</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ============ 登录浮层（不是页面） ============ -->
+    <div class="auth-overlay" id="flowAuthOverlay">
+      <section class="auth-card" id="authPanel" role="dialog" aria-modal="true" aria-label="登录">
+        <div class="auth-head">
+          <div>
+            <h2 class="auth-title">给你建一个专属练习空间</h2>
+            <p class="auth-sub">练过的内容会安全地留下来，换台设备也能接着练。</p>
+          </div>
+          <button id="flowAuthCloseBtn" type="button" class="tone-ghost auth-close" aria-label="关闭">
+            ×
+          </button>
+        </div>
+        <p class="badge visually-hidden">
+          当前模式: <code id="currentAuthMode">supabase</code>
+        </p>
         <div class="grid two">
           <label>
             邮箱
@@ -114,12 +524,44 @@
             <input id="supabasePassword" type="password" placeholder="至少 6 位" />
           </label>
         </div>
-
         <div class="actions">
-          <button id="supabaseSignupBtn" type="button" class="tone-warm">注册</button>
-          <button id="supabaseLoginBtn" type="button">登录并获取 Token</button>
+          <button id="supabaseLoginBtn" type="button">登录</button>
+          <button id="supabaseSignupBtn" type="button" class="tone-warm">注册新账号</button>
+        </div>
+        <div class="actions auth-secondary-row">
+          <button id="gotoPracticeFromAuthBtn" type="button" class="tone-ghost">
+            已登录，继续去对练
+          </button>
           <button id="clearTokenBtn" type="button" class="tone-ghost">退出登录</button>
         </div>
+
+        <details class="soft-details">
+          <summary>第一次来？看看 4 步引导</summary>
+          <div class="details-body">
+            <section id="journeyPanel" class="journey-panel">
+              <div class="panel-title-row">
+                <h3>新手引导（首轮）</h3>
+                <p class="badge"><code id="journeyProgress">0/4</code></p>
+              </div>
+              <p id="journeyHint" class="meta">
+                先完成注册登录，再发送第 1 轮消息。安装应用是可选项，可以先跳过。
+              </p>
+              <div class="journey-track">
+                <span id="journeyStepInstall" class="journey-pill">1. 安装（可选）</span>
+                <span id="journeyStepAuth" class="journey-pill">2. 注册/登录</span>
+                <span id="journeyStepPractice" class="journey-pill">3. 发送第 1 轮</span>
+                <span id="journeyStepReview" class="journey-pill">4. 生成行动卡</span>
+              </div>
+              <div class="actions">
+                <button id="journeyPrimaryBtn" type="button">下一步</button>
+                <button id="journeySkipInstallBtn" type="button" class="tone-ghost">
+                  安装先跳过
+                </button>
+                <button id="dismissJourneyBtn" type="button" class="tone-ghost">隐藏引导</button>
+              </div>
+            </section>
+          </div>
+        </details>
 
         <details class="advanced-block">
           <summary>高级设置（一般不用改）</summary>
@@ -131,322 +573,22 @@
             <button id="saveConfigBtn" type="button" class="tone-ghost">保存高级配置</button>
           </div>
         </details>
-
-        <div class="actions">
-          <button id="gotoPracticeFromAuthBtn" type="button" class="tone-ghost">
-            已登录，去开始对练
-          </button>
-        </div>
-
-        <p id="noticeBar" class="notice is-hidden"></p>
       </section>
+    </div>
 
-      <section id="quickCheckPanel" class="panel panel--secondary panel--collapsible">
-        <details id="quickCheckDetails" class="collapsible-panel">
-          <summary class="collapsible-summary">
-            <span class="collapsible-title">连接自检（快速）</span>
-            <span class="collapsible-hint">仅在遇到“能打开但功能异常”时展开</span>
-          </summary>
-          <div class="collapsible-body">
-            <div class="actions">
-              <button id="runQuickCheckBtn" type="button" class="tone-ghost">运行自检</button>
-            </div>
-            <p id="quickCheckSummary" class="meta quick-check-summary is-idle">
-              用于快速定位“网页能打开但功能异常”的问题。
-            </p>
-            <ul class="quick-check-list">
-              <li>
-                <span>静态资源</span>
-                <code id="quickCheckStatic" class="quick-check-badge is-idle">未执行</code>
-              </li>
-              <li>
-                <span>后端代理</span>
-                <code id="quickCheckBackend" class="quick-check-badge is-idle">未执行</code>
-              </li>
-              <li>
-                <span>业务 API</span>
-                <code id="quickCheckApi" class="quick-check-badge is-idle">未执行</code>
-              </li>
-              <li>
-                <span>登录状态</span>
-                <code id="quickCheckAuth" class="quick-check-badge is-idle">未执行</code>
-              </li>
-            </ul>
-            <p class="meta compact-meta">
-              若“后端代理”失败，请先直接打开 <code>/health-backend</code> 查看是否返回 JSON。
-            </p>
-          </div>
-        </details>
-      </section>
+    <!-- 全局通知 toast（所有通知的唯一出口） -->
+    <p id="noticeBar" class="notice is-hidden"></p>
 
-      <section id="practicePanel" class="panel panel--primary">
-        <div class="panel-title-row">
-          <h2>Step 2. 开始对练</h2>
-          <div class="runtime-meta">
-            <span>scene: <code id="sceneIdValue">-</code></span>
-            <span>session: <code id="sessionIdValue">-</code></span>
-            <span>turn: <code id="currentTurnValue">0</code></span>
-          </div>
-        </div>
+    <!-- 全局柔性加载罩 -->
+    <div class="flow-loading" id="flowLoading">
+      <div class="flow-loading-card">
+        <span class="flow-loading-dot"></span>
+        <p class="flow-loading-text" id="flowLoadingText">在准备你的练习空间…</p>
+      </div>
+    </div>
 
-        <div class="grid two">
-          <label>
-            场景模板
-            <select id="templatePreset">
-              <option value="peer_delay">同事延期反馈</option>
-              <option value="manager_alignment">上级预期对齐</option>
-              <option value="cross_team_conflict">跨团队冲突协调</option>
-              <option value="custom">自定义</option>
-            </select>
-          </label>
-          <label>
-            目标轮数
-            <input id="targetTurns" type="number" min="5" max="8" value="6" />
-          </label>
-        </div>
-
-        <div class="grid two">
-          <label>
-            场景标题
-            <input id="sceneTitle" type="text" value="和同事沟通延期风险" />
-          </label>
-          <label>
-            沟通目标
-            <input id="sceneGoal" type="text" value="确认新的里程碑并明确责任" />
-          </label>
-        </div>
-
-        <label>
-          场景背景
-          <textarea id="sceneContext" rows="3">这个需求已经两次延期，影响发布节奏。</textarea>
-        </label>
-
-        <div class="practice-mode-switch" role="group" aria-label="练习模式">
-          <button id="practiceModeTextBtn" type="button" class="mode-option is-active">文字对练</button>
-          <button id="practiceModeVoiceBtn" type="button" class="mode-option">语音对练</button>
-        </div>
-
-        <div id="textPracticeBlock">
-          <label>
-            你的发言
-            <textarea id="messageContent" rows="3">你们总是拖延，根本不专业。</textarea>
-          </label>
-          <p class="meta compact-meta">不会开场时可先用“我观察到...我感到...我希望...”句式。</p>
-          <p class="meta compact-meta">
-            可以先填写场景和发言。若尚未登录，点击“创建场景并发送第 1 轮”时会先引导登录，成功后自动继续。
-          </p>
-          <div class="actions message-starter-row">
-            <button id="starterSoftBtn" type="button" class="tone-ghost">和缓开场</button>
-            <button id="starterDirectBtn" type="button" class="tone-ghost">直接表达</button>
-            <button id="starterBoundaryBtn" type="button" class="tone-ghost">边界表达</button>
-          </div>
-
-          <div class="actions">
-            <button id="startPracticeBtn" type="button">创建场景并发送第 1 轮</button>
-            <button id="sendMessageBtn" type="button">发送下一轮（第 2 轮起）</button>
-            <button id="newSessionBtn" type="button" class="tone-ghost">重置并开始新会话</button>
-          </div>
-        </div>
-
-        <div id="voicePracticeBlock" class="voice-practice-block is-hidden">
-          <div class="voice-status-row">
-            <div>
-              <p class="voice-status-label">语音状态</p>
-              <p id="voiceStatusText" class="voice-status-text">未开始</p>
-            </div>
-            <div class="voice-meta-grid">
-              <span>channel: <code id="voiceChannelValue">-</code></span>
-              <span>agent: <code id="voiceAgentValue">-</code></span>
-            </div>
-          </div>
-          <div class="actions">
-            <button id="voiceStartBtn" type="button">开始语音对练</button>
-            <button id="voiceStopBtn" type="button" class="tone-ghost" disabled>结束语音对练</button>
-          </div>
-          <p class="meta compact-meta">
-            语音会话会复用当前场景与目标轮数，结束后进入同一套历史和复盘流程。
-          </p>
-          <div id="voiceTranscriptList" class="voice-transcript-list" aria-live="polite">
-            <p class="empty">语音转录会在对话开始后显示。</p>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <h2>即时反馈</h2>
-        <div class="feedback-grid">
-          <article class="feedback-card">
-            <h3>AI 回复</h3>
-            <p id="assistantReply" class="assistant-reply">发送一条消息后，这里会显示对方回复。</p>
-          </article>
-          <article class="feedback-card">
-            <h3>结构化反馈</h3>
-            <div class="metric-row">
-              <span>总分</span>
-              <strong id="feedbackOverall">-</strong>
-            </div>
-            <div class="metric-row">
-              <span>风险等级</span>
-              <strong id="feedbackRisk">-</strong>
-            </div>
-            <p class="next-line">
-              <small>下一句建议</small>
-              <span id="nextSentence">-</span>
-            </p>
-            <ul class="ofnr-list">
-              <li><b>O</b> <span id="ofnrObservation">-</span></li>
-              <li><b>F</b> <span id="ofnrFeeling">-</span></li>
-              <li><b>N</b> <span id="ofnrNeed">-</span></li>
-              <li><b>R</b> <span id="ofnrRequest">-</span></li>
-            </ul>
-          </article>
-        </div>
-
-        <h3>会话记录</h3>
-        <div class="actions">
-          <label class="inline-input">
-            跳到轮次
-            <select id="turnJumpSelect">
-              <option value="">最新一轮</option>
-            </select>
-          </label>
-          <button id="continuePracticeBtn" type="button" class="tone-ghost">继续当前会话</button>
-        </div>
-        <div id="conversationList" class="conversation-list">
-          <p class="empty">还没有会话记录。</p>
-        </div>
-      </section>
-
-      <section id="historyPanel" class="panel panel--secondary">
-        <div class="panel-title-row">
-          <h2>历史会话列表（跨会话回看）</h2>
-          <div class="actions">
-            <label class="inline-input">
-              最近数量
-              <input id="historyLimit" type="number" min="1" max="50" value="10" />
-            </label>
-            <label class="inline-input">
-              状态
-              <select id="historyState">
-                <option value="">全部</option>
-                <option value="ACTIVE">进行中</option>
-                <option value="COMPLETED">已完成</option>
-                <option value="ABANDONED">已中止</option>
-              </select>
-            </label>
-            <label class="inline-input history-keyword">
-              关键词
-              <input id="historyKeyword" type="text" placeholder="标题/目标/消息" />
-            </label>
-          </div>
-        </div>
-        <div class="actions history-filter-row">
-          <label class="inline-input">
-            开始日期
-            <input id="historyCreatedFrom" type="date" />
-          </label>
-          <label class="inline-input">
-            结束日期
-            <input id="historyCreatedTo" type="date" />
-          </label>
-          <button id="refreshHistoryBtn" type="button" class="tone-ghost">应用筛选</button>
-          <button id="resetHistoryFiltersBtn" type="button" class="tone-ghost">清空筛选</button>
-        </div>
-        <p id="historyFilterHint" class="meta">当前筛选: 全部</p>
-        <div class="history-pagination">
-          <button id="historyPrevBtn" type="button" class="tone-ghost">上一页</button>
-          <span id="historyPageMeta">第 1/1 页 · 共 0 条</span>
-          <button id="historyNextBtn" type="button" class="tone-ghost">下一页</button>
-        </div>
-        <div id="historySessionList" class="history-session-list">
-          <p class="empty">暂无历史会话，完成一次练习后这里会出现记录。</p>
-        </div>
-      </section>
-
-      <section id="reviewPanel" class="panel">
-        <h2>Step 3. 总结与复盘</h2>
-        <div class="actions">
-          <button id="generateSummaryBtn" type="button">生成行动卡</button>
-          <button id="weeklyProgressBtn" type="button" class="tone-ghost">查看本周进度</button>
-        </div>
-
-        <div class="summary-grid">
-          <article class="summary-card">
-            <h3>行动卡</h3>
-            <p class="meta" id="summaryMeta">尚未生成</p>
-            <p><small>开场句</small><span id="summaryOpening" class="summary-value">-</span></p>
-            <p><small>请求句</small><span id="summaryRequest" class="summary-value">-</span></p>
-            <p><small>兜底句</small><span id="summaryFallback" class="summary-value">-</span></p>
-            <p><small>风险提醒</small><span id="summaryRisks" class="summary-value">-</span></p>
-            <div class="actions summary-actions">
-              <button id="copySummaryBtn" type="button" class="tone-ghost">复制行动卡</button>
-              <button id="exportSummaryBtn" type="button" class="tone-ghost">导出 Markdown</button>
-              <button id="exportSummaryPdfBtn" type="button" class="tone-ghost">导出 PDF</button>
-              <button id="exportSummaryImageBtn" type="button" class="tone-ghost">导出图片</button>
-            </div>
-            <div class="share-template-block">
-              <label class="inline-input">
-                分享模板
-                <select id="shareTemplateType">
-                  <option value="peer">发给同事</option>
-                  <option value="manager">发给上级</option>
-                  <option value="self">复盘记录</option>
-                </select>
-              </label>
-              <div class="actions summary-actions">
-                <button id="copyShareTemplateBtn" type="button" class="tone-ghost">复制模板</button>
-                <button id="downloadShareTemplateBtn" type="button" class="tone-ghost">
-                  导出模板
-                </button>
-              </div>
-              <textarea
-                id="shareTemplatePreview"
-                rows="5"
-                readonly
-                placeholder="生成行动卡后，这里会出现可直接分享的文案模板。"
-              ></textarea>
-            </div>
-          </article>
-
-          <article class="summary-card">
-            <h3>次日复盘</h3>
-            <div class="grid two compact">
-              <label>
-                是否已用于真实对话
-                <select id="usedInRealWorld">
-                  <option value="true">是</option>
-                  <option value="false">否</option>
-                </select>
-              </label>
-              <label>
-                效果评分（1-5）
-                <input id="outcomeScore" type="number" min="1" max="5" placeholder="可选" />
-              </label>
-            </div>
-            <label>
-              备注（可选）
-              <textarea id="blockerNote" rows="2" placeholder="本次对话最大的阻碍是什么？"></textarea>
-            </label>
-            <button id="submitReflectionBtn" type="button">提交复盘</button>
-            <p class="meta" id="reflectionMeta">尚未提交复盘</p>
-          </article>
-
-          <article class="summary-card">
-            <h3>周进度</h3>
-            <label>
-              week_start
-              <input id="progressWeekStart" type="date" />
-            </label>
-            <ul class="progress-list">
-              <li>练习次数 <strong id="progressPracticeCount">-</strong></li>
-              <li>总结次数 <strong id="progressSummaryCount">-</strong></li>
-              <li>真实应用 <strong id="progressRealCount">-</strong></li>
-              <li>平均得分 <strong id="progressOutcome">-</strong></li>
-            </ul>
-          </article>
-        </div>
-      </section>
-
+    <!-- 开发者面板（仅本地 dev，applyModeVisibility 自动隐藏） -->
+    <div class="shell">
       <section class="panel" data-dev-only>
         <h2>开发者配置（仅本地 dev）</h2>
         <div class="grid two">
@@ -487,7 +629,9 @@
           <button id="enablePwaBtn" type="button" class="tone-ghost">启用 PWA</button>
           <button id="disablePwaBtn" type="button" class="tone-ghost">禁用 PWA</button>
           <button id="unregisterSwBtn" type="button" class="tone-ghost">清理 SW</button>
-          <button id="clearOfflineSnapshotsBtn" type="button" class="tone-ghost">清理离线快照</button>
+          <button id="clearOfflineSnapshotsBtn" type="button" class="tone-ghost">
+            清理离线快照
+          </button>
         </div>
       </section>
 
@@ -495,10 +639,11 @@
         <h2>调试输出（仅本地 dev）</h2>
         <pre id="output">{}</pre>
       </section>
-    </main>
+    </div>
 
     <script src="./vendor/agora/agora-rtc-sdk-ng/AgoraRTC_N-production.js"></script>
     <script src="./vendor/agora/agora-rtm/agora-rtm.js"></script>
     <script src="./app.js"></script>
+    <script src="./flow.js"></script>
   </body>
 </html>
