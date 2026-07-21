@@ -106,6 +106,26 @@ cd backend
 pytest tests -q
 ```
 
+### 4.2.1 前端本地联调（静态 + /api 代理）
+
+本地直接用 `python3 -m http.server` 打开 web/ 时，所有 API 都会失败：
+生产依赖 Cloudflare Pages Function 的同源 `/api` 代理，且后端 CORS 不放行
+localhost 跨域直连。请改用仓库自带的 dev server，它会补齐这一层代理：
+
+```bash
+# 终端 1：本地后端（mock 鉴权默认开启，可用 Mock 用户联调）
+cd backend && ../.venv/bin/uvicorn app.main:app --port 8000
+
+# 终端 2：静态 + 代理（默认代理到 http://localhost:8000）
+python3 scripts/dev_server.py          # 打开 http://localhost:8787
+
+# 想直连生产后端（需真实 Supabase 账号，Mock 会被生产拒绝）：
+BACKEND_URL=https://api.leoalgo.site python3 scripts/dev_server.py
+```
+
+开发者面板（API 地址 / Mock 切换 / 调试输出）默认隐藏，用
+`http://localhost:8787/index.html?dev=1` 打开即可显示。
+
 ### 4.3 前端体验（M3）
 
 1. 打开前端页面（Cloudflare 域名）

@@ -10,6 +10,14 @@
 (function () {
   "use strict";
 
+  // vendor/agora-agent-client-toolkit/index.mjs 是 esbuild 产物，
+  // 残留了两处 Node 的 process.env.NODE_ENV 引用（第 236/1869 行）。
+  // 浏览器没有 process，语音启动时的动态 import 会抛 ReferenceError。
+  // 在其求值前补一个最小 shim（本文件加载远早于任何语音操作）。
+  if (typeof window.process === "undefined") {
+    window.process = { env: { NODE_ENV: "production" } };
+  }
+
   var ONBOARDING_DONE_KEY = "nvc_onboarding_done";
   var PAGES = ["home", "practice", "review"];
 
@@ -380,19 +388,33 @@
    * 复盘页：自动生成行动卡 + 写信
    * ------------------------------------------------------- */
   function onEnterReview() {
+    ensureReviewMaterial()
+      .then(function () {
+        var s = getState();
+        var hasMaterial = s.sessionId && (s.turn > 0 || (s.history && s.history.length > 0));
+        if (hasMaterial && !s.summary && typeof window.generateSummary === "function") {
+          return Promise.resolve(window.generateSummary()).catch(function () {
+            /* 失败时保留手动按钮，不打断页面 */
+          });
+        }
+        return null;
+      })
+      .then(function () {
+        renderLetter();
+      });
+  }
+
+  // 语音对练刚结束时，轮次只存在后端（本地 turn=0/history 为空）：
+  // 先把会话内容拉回来，再生成行动卡和信。
+  function ensureReviewMaterial() {
     var s = getState();
-    var hasMaterial = s.sessionId && (s.turn > 0 || (s.history && s.history.length > 0));
-    if (hasMaterial && !s.summary && typeof window.generateSummary === "function") {
-      Promise.resolve(window.generateSummary())
-        .catch(function () {
-          /* 失败时保留手动按钮，不打断页面 */
-        })
-        .then(function () {
-          renderLetter();
-        });
-      return;
+    var hasLocal = s.sessionId && (s.turn > 0 || (s.history && s.history.length > 0));
+    if (hasLocal || !s.sessionId || typeof window.loadSessionHistory !== "function") {
+      return Promise.resolve();
     }
-    renderLetter();
+    return Promise.resolve(window.loadSessionHistory(s.sessionId)).catch(function () {
+      /* 拉取失败就按空素材渲染，信里会引导用户回去练习 */
+    });
   }
 
   function renderLetter() {
@@ -547,6 +569,22 @@
   }
 
   /* ---------------------------------------------------------
+   * 开发者面板：默认隐藏，仅 ?dev=1 时显示。
+   * app.js 的 applyModeVisibility 在 localhost 会把它放出来，
+   * 这里在其之后执行，重新按用户视角收口。
+   * ------------------------------------------------------- */
+  function applyDevPanelVisibility() {
+    var dev = new URLSearchParams(window.location.search).get("dev") === "1";
+    var blocks = document.querySelectorAll("[data-dev-only]");
+    for (var i = 0; i < blocks.length; i++) {
+      blocks[i].classList.toggle("is-hidden", !dev);
+    }
+    // 包裹容器一并收起，避免留下一截空白
+    var shell = document.querySelector(".shell");
+    if (shell) shell.classList.toggle("is-hidden", !dev);
+  }
+
+  /* ---------------------------------------------------------
    * 首次路由：老用户跳过欢迎页
    * ------------------------------------------------------- */
   function initRoute() {
@@ -571,6 +609,7 @@
   wrapCallApi();
   wrapSetNotice();
   bindFlowControls();
+  applyDevPanelVisibility();
   initRoute();
   // bind() 的首次 renderHistory 早于包装执行，这里补一次 post-pass
   postProcessChat();

@@ -1,4 +1,4 @@
-const SW_VERSION = "v11";
+const SW_VERSION = "v12";
 const STATIC_CACHE_NAME = `nvc-static-${SW_VERSION}`;
 const SHELL_CACHE_FILES = [
   "/styles.css",
@@ -22,19 +22,18 @@ function isStaticCandidate(request, url) {
   return ["style", "image", "font"].includes(request.destination);
 }
 
-async function cacheFirst(request) {
-  const cacheKey = request;
-
-  const cached = await matchStaticCache(cacheKey, { ignoreSearch: request.mode === "navigate" });
-  if (cached) {
-    return cached;
-  }
-
+async function networkFirst(request) {
+  // 在线时永远先取新文件，避免同版本 SW 部署后样式/图标长期过期；
+  // 离线时回退到缓存，保留原有的离线能力。
   try {
     const response = await fetch(request);
-    await putStaticCache(cacheKey, response);
+    await putStaticCache(request, response);
     return response;
   } catch {
+    const cached = await matchStaticCache(request);
+    if (cached) {
+      return cached;
+    }
     return buildOfflineTextResponse();
   }
 }
@@ -118,7 +117,7 @@ self.addEventListener("fetch", (event) => {
 
   if (isStaticCandidate(request, url)) {
     event.respondWith(
-      cacheFirst(request).catch(() => fetch(request).catch(() => buildOfflineTextResponse()))
+      networkFirst(request).catch(() => fetch(request).catch(() => buildOfflineTextResponse()))
     );
   }
 });
