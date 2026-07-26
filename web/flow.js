@@ -196,6 +196,8 @@
 
   /* ---------------------------------------------------------
    * 柔性加载罩（callApi 包装，>300ms 才现身）
+   * 后台请求（语音转写同步、历史列表刷新等）不触发遮罩；
+   * 等待过久时给出“取消”出口，绝不把用户困在遮罩下。
    * ------------------------------------------------------- */
   var LOADING_COPY = [
     ["/scenes", "在布置你的练习场景…"],
@@ -205,8 +207,28 @@
     ["/sessions", "在翻找你的练习记录…"],
     ["/auth", "在确认你的身份…"],
   ];
-  var inflight = 0;
+  // 后台自动发生的请求：不该用全屏遮罩打断用户
+  var SILENT_URL_KEYWORDS = ["/transcripts", "/trends/", "/inspiration/", "/health"];
+  var LOADING_SLOW_MS = 8000;
+  var LOADING_CANCEL_MS = 25000;
+  var LOADING_AUTO_CANCEL_MS = 60000;
+
+  var inflightTokens = [];
   var loadingTimer = null;
+  var loadingWatchdog = null;
+  var loadingShownAt = 0;
+  var loadingCancelEl = null;
+
+  function isSilentRequest(url, options) {
+    var u = String(url || "");
+    var method = String((options && options.method) || "GET").toUpperCase();
+    for (var i = 0; i < SILENT_URL_KEYWORDS.length; i++) {
+      if (u.indexOf(SILENT_URL_KEYWORDS[i]) !== -1) return true;
+    }
+    // 历史列表 / 会话可用性探测：GET /api/v1/sessions?...
+    if (method === "GET" && u.indexOf("/sessions?") !== -1) return true;
+    return false;
+  }
 
   function pickLoadingCopy(url) {
     var u = String(url || "");
@@ -216,19 +238,82 @@
     return "在准备你的练习空间…";
   }
 
+  function ensureLoadingCancelEl() {
+    if (loadingCancelEl) return loadingCancelEl;
+    var card = document.querySelector("#flowLoading .flow-loading-card");
+    if (!card) return null;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "flow-loading-cancel is-hidden";
+    btn.textContent = "等太久了？点这里先取消";
+    btn.addEventListener("click", function () {
+      forceHideLoading();
+      if (typeof window.setNotice === "function") {
+        window.setNotice("已取消等待。操作可能还在后台处理，稍后再看看？", "warning");
+      }
+    });
+    card.appendChild(btn);
+    loadingCancelEl = btn;
+    return btn;
+  }
+
+  function runLoadingWatchdog() {
+    if (!loadingShownAt) return;
+    var elapsed = Date.now() - loadingShownAt;
+    var text = $("flowLoadingText");
+    if (elapsed >= LOADING_AUTO_CANCEL_MS) {
+      forceHideLoading();
+      if (typeof window.setNotice === "function") {
+        window.setNotice("这次等得太久了，先帮你取消了。网络好像有点卡，再试一次？", "warning");
+      }
+      return;
+    }
+    if (elapsed >= LOADING_CANCEL_MS) {
+      var btn = ensureLoadingCancelEl();
+      if (btn) btn.classList.remove("is-hidden");
+      if (text) text.textContent = "还在努力，比平常慢一些…";
+    } else if (elapsed >= LOADING_SLOW_MS && text) {
+      text.textContent = "还在努力，再等一下下…";
+    }
+  }
+
+  function showLoading(url) {
+    var text = $("flowLoadingText");
+    if (text) text.textContent = pickLoadingCopy(url);
+    var btn = ensureLoadingCancelEl();
+    if (btn) btn.classList.add("is-hidden");
+    var mask = $("flowLoading");
+    if (mask) mask.classList.add("is-visible");
+    loadingShownAt = Date.now();
+    window.clearInterval(loadingWatchdog);
+    loadingWatchdog = window.setInterval(runLoadingWatchdog, 1000);
+  }
+
+  function hideLoading() {
+    loadingShownAt = 0;
+    window.clearTimeout(loadingTimer);
+    window.clearInterval(loadingWatchdog);
+    var mask = $("flowLoading");
+    if (mask) mask.classList.remove("is-visible");
+  }
+
+  function forceHideLoading() {
+    inflightTokens.length = 0;
+    hideLoading();
+  }
+
   function wrapCallApi() {
     if (typeof window.callApi !== "function") return;
     var orig = window.callApi;
     window.callApi = function (url, options) {
-      inflight += 1;
-      if (inflight === 1) {
+      if (isSilentRequest(url, options)) {
+        return orig(url, options);
+      }
+      var token = {};
+      inflightTokens.push(token);
+      if (inflightTokens.length === 1) {
         loadingTimer = window.setTimeout(function () {
-          if (inflight > 0) {
-            var text = $("flowLoadingText");
-            if (text) text.textContent = pickLoadingCopy(url);
-            var mask = $("flowLoading");
-            if (mask) mask.classList.add("is-visible");
-          }
+          if (inflightTokens.length > 0) showLoading(url);
         }, 300);
       }
       return Promise.resolve()
@@ -236,14 +321,46 @@
           return orig(url, options);
         })
         .finally(function () {
-          inflight -= 1;
-          if (inflight <= 0) {
-            inflight = 0;
-            window.clearTimeout(loadingTimer);
-            var mask = $("flowLoading");
-            if (mask) mask.classList.remove("is-visible");
-          }
+          var index = inflightTokens.indexOf(token);
+          if (index !== -1) inflightTokens.splice(index, 1);
+          if (inflightTokens.length === 0) hideLoading();
         });
+    };
+  }
+
+  /* ---------------------------------------------------------
+   * 包装：语音转写同步 → 串行化
+   * 连麦中 TRANSCRIPT_UPDATED 触发频繁，并发同步会互相踩踏
+   * （后端 409）并放大延迟；这里排队成一次一个，丢帧由下一轮
+   * 补偿（app.js 内部按未同步集合重扫，不会丢轮次）。
+   * ------------------------------------------------------- */
+  function wrapVoiceTranscriptSync() {
+    if (typeof window.syncCompletedVoiceTranscript !== "function") return;
+    var orig = window.syncCompletedVoiceTranscript;
+    var inFlight = false;
+    var queued = false;
+    window.syncCompletedVoiceTranscript = function (config, toolkit) {
+      if (inFlight) {
+        queued = true;
+        return Promise.resolve();
+      }
+      inFlight = true;
+      var run = function () {
+        queued = false;
+        return Promise.resolve()
+          .then(function () {
+            return orig(config, toolkit);
+          })
+          .catch(function () {
+            /* 冲突/失败由下一轮补偿同步兜底 */
+          })
+          .then(function () {
+            if (queued) return run();
+            inFlight = false;
+            return null;
+          });
+      };
+      return run();
     };
   }
 
@@ -608,6 +725,7 @@
   wrapShowError();
   wrapCallApi();
   wrapSetNotice();
+  wrapVoiceTranscriptSync();
   bindFlowControls();
   applyDevPanelVisibility();
   initRoute();

@@ -1986,6 +1986,21 @@ button.tone-ghost:hover {
   color: var(--muted);
 }
 
+.flow-loading-cancel {
+  border: none;
+  background: none;
+  padding: 4px 8px;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.flow-loading-cancel:hover {
+  opacity: 0.8;
+}
+
 /* -------- 其他柔化 -------- */
 
 .journey-pill {
