@@ -258,7 +258,7 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
 
     for attempt in range(max_attempts):
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=20.0, trust_env=False) as client:
                 response = await client.post(url, headers=headers, json=payload)
                 if response.status_code in retry_statuses and attempt < max_attempts - 1:
                     await asyncio.sleep(0.5 * (attempt + 1))

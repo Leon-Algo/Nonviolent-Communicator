@@ -21,7 +21,7 @@ from app.schemas.voice import (
     VoiceTranscriptSyncResponse,
 )
 from app.services.nvc_service import analyze_message
-from app.services.voice_agent import VoiceAgentService
+from app.services.voice_agent import VoiceAgentConfigurationError, VoiceAgentService
 
 router = APIRouter(prefix="/api/v1/voice", tags=["voice"])
 voice_agent_service = VoiceAgentService()
@@ -78,16 +78,27 @@ async def start_voice_session(
     channel_name = f"nvc-{session_id}"
     user_uid, agent_uid = _allocate_rtc_uids()
 
-    config = voice_agent_service.generate_config(
-        channel_name=channel_name,
-        user_uid=user_uid,
-        agent_uid=agent_uid,
-    )
-    start_result = await voice_agent_service.start_agent(
-        channel_name=channel_name,
-        agent_uid=agent_uid,
-        user_uid=user_uid,
-    )
+    try:
+        config = voice_agent_service.generate_config(
+            channel_name=channel_name,
+            user_uid=user_uid,
+            agent_uid=agent_uid,
+        )
+        start_result = await voice_agent_service.start_agent(
+            channel_name=channel_name,
+            agent_uid=agent_uid,
+            user_uid=user_uid,
+        )
+    except VoiceAgentConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="voice agent service unavailable",
+        ) from exc
     agent_id = start_result["agent_id"]
 
     try:
@@ -153,7 +164,11 @@ async def stop_voice_session(
 
     agent_id = session.get("voice_agent_id")
     if agent_id:
-        await voice_agent_service.stop_agent(agent_id)
+        try:
+            await voice_agent_service.stop_agent(agent_id)
+        except Exception:
+            # 远端停不掉不阻塞本地收尾；agent 有 idle_timeout 会自动退出
+            pass
 
     final_state = "COMPLETED" if session["state"] == "COMPLETED" else "ABANDONED"
     await db.execute(

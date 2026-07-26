@@ -126,6 +126,18 @@ BACKEND_URL=https://api.leoalgo.site python3 scripts/dev_server.py
 开发者面板（API 地址 / Mock 切换 / 调试输出）默认隐藏，用
 `http://localhost:8787/index.html?dev=1` 打开即可显示。
 
+#### macOS 系统代理坑（语音/LLM 偶发失效）
+
+httpx 默认 `trust_env=True`，在 macOS 上会经 `urllib.getproxies()`
+**回退读取系统代理设置**（即使进程没有任何 `*_PROXY` 环境变量）。
+本机代理（Clash 等）节点不可用时，后端到 Agora REST / ModelScope /
+Supabase 的请求会 ConnectError 或挂起数分钟，表现为「语音对练一直
+加载、最终 500」。后端所有 httpx 客户端已显式 `trust_env=False`
+（`voice_agent.py` / `nvc_service.py` / `supabase_auth.py`），
+直连这三个服务即可；Agora agent 启动失败会被映射为
+`502 voice agent service unavailable`，前端柔性提示而不是卡死。
+如确需走代理，请在代码里显式配置，不要依赖系统代理。
+
 ### 4.3 前端体验（M3）
 
 1. 打开前端页面（Cloudflare 域名）

@@ -2,6 +2,8 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
+
 from app.core.config import Settings, settings
 
 NVC_COACH_PROMPT = """你是一位温柔而专业的非暴力沟通（NVC）语音教练，名叫小和。
@@ -137,6 +139,9 @@ class VoiceAgentService:
                 area=getattr(Area, self.settings.agora_area, Area.US),
                 app_id=app_id,
                 app_certificate=app_certificate,
+                # trust_env=False：httpx 默认会读 macOS 系统代理（urllib
+                # getproxies 回退），本机代理不可用时 Agora REST 会连接失败。
+                httpx_client=httpx.AsyncClient(trust_env=False, timeout=30.0),
             )
         return self._client
 
