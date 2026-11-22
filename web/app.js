@@ -2206,33 +2206,41 @@ function renderVoiceState() {
 
 async function loadAgoraAgentToolkit() {
   if (window.NvcAgoraAgentToolkit) return window.NvcAgoraAgentToolkit;
+  // 官方 toolkit 的 browser bundle 残留了 Node 构建产物里的 process.env.NODE_ENV
+  // 判断，直接在浏览器执行会抛 ReferenceError("process is not defined") 并打断
+  // AgoraVoiceAI.init。补一个最小 process shim（打包器的标准做法）。
+  if (typeof window.process === "undefined") {
+    window.process = { env: { NODE_ENV: "production" } };
+  }
   const toolkit = await import("./vendor/agora/agora-agent-client-toolkit/index.mjs");
   window.NvcAgoraAgentToolkit = toolkit;
   return toolkit;
 }
 
-function waitForRtmConnected(rtmClient, timeoutMs = 800) {
+function waitForRtmConnected(rtmClient, timeoutMs = 15000) {
   return new Promise((resolve) => {
     let settled = false;
     let timer = null;
 
-    const finish = () => {
+    const finish = (connected) => {
       if (settled) return;
       settled = true;
       if (timer) window.clearTimeout(timer);
       rtmClient.removeEventListener?.("status", onStatus);
-      resolve();
+      resolve(connected);
     };
 
     const onStatus = (event) => {
       const nextState = event?.newState || event?.state;
       if (nextState === "CONNECTED") {
-        finish();
+        finish(true);
+      } else if (nextState === "FAILED" || nextState === "DISCONNECTED") {
+        finish(false);
       }
     };
 
     rtmClient.addEventListener?.("status", onStatus);
-    timer = window.setTimeout(finish, timeoutMs);
+    timer = window.setTimeout(() => finish(false), timeoutMs);
   });
 }
 
@@ -2366,10 +2374,28 @@ async function initializeVoiceClient(voiceConfig) {
   const client = window.AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
   let rtmClient = null;
   if (window.AgoraRTM?.RTM) {
-    rtmClient = new window.AgoraRTM.RTM(voiceConfig.app_id, String(voiceConfig.uid));
-    await rtmClient.login({ token: voiceConfig.token });
-    await waitForRtmConnected(rtmClient);
-    await rtmClient.subscribe(voiceConfig.channel_name);
+    // RTM 只用于订阅转录/Agent 状态，属增强能力：失败必须降级为纯 RTC 语音，
+    // 不能因信令不可用把整条语音链路带崩（真实故障：presence 未连接 -13001）。
+    try {
+      const candidate = new window.AgoraRTM.RTM(voiceConfig.app_id, String(voiceConfig.uid));
+      await candidate.login({ token: voiceConfig.token });
+      const rtmConnected = await waitForRtmConnected(candidate);
+      if (rtmConnected) {
+        // 转录走消息通道即可；presence 不是必需，关掉可避免
+        // RTM_ERROR_PRESENCE_NOT_CONNECTED(-13001) 拖垮订阅。
+        await candidate.subscribe(voiceConfig.channel_name, {
+          withPresence: false,
+          withMessage: true,
+        });
+        rtmClient = candidate;
+      } else {
+        console.warn("RTM 未在超时内连接，语音将以纯 RTC 模式继续（转录可能不可用）。");
+        candidate.logout?.().catch?.(() => {});
+      }
+    } catch (error) {
+      console.warn("RTM 初始化失败，降级为纯 RTC 语音：", error);
+      rtmClient = null;
+    }
   }
 
   const micTrack = await window.AgoraRTC.createMicrophoneAudioTrack();
