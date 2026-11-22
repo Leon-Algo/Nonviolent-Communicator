@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 from dataclasses import dataclass
 
@@ -14,6 +15,8 @@ from app.schemas.sessions import (
     OfnrStatus,
     RiskLevel,
 )
+
+logger = logging.getLogger(__name__)
 
 ABSOLUTE_WORDS = ("总是", "从来", "根本", "一定", "每次都")
 JUDGMENT_WORDS = ("不专业", "糟糕", "垃圾", "无能", "离谱", "怎么就不行", "不行")
@@ -413,6 +416,7 @@ def build_rewrite_sentence(source_text: str) -> str:
 
 async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4, max_tokens: int = 300) -> str | None:
     if not settings.llm_api_key:
+        logger.warning("llm_call_skipped_no_api_key model=%s", settings.llm_model)
         return None
 
     url = f"{settings.openai_base_url.rstrip('/')}/chat/completions"
@@ -442,6 +446,11 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
                 data = response.json()
                 choices = data.get("choices") if isinstance(data, dict) else None
                 if not isinstance(choices, list) or not choices:
+                    logger.warning(
+                        "llm_call_empty_choices model=%s body=%s",
+                        settings.llm_model,
+                        str(data)[:200],
+                    )
                     return None
 
                 message = choices[0].get("message") if isinstance(choices[0], dict) else None
@@ -449,7 +458,10 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
 
                 if isinstance(content, str):
                     normalized = content.strip()
-                    return normalized or None
+                    if normalized:
+                        return normalized
+                    logger.warning("llm_call_empty_content model=%s", settings.llm_model)
+                    return None
 
                 if isinstance(content, list):
                     text_parts = []
@@ -459,21 +471,45 @@ async def _call_openai_compatible(messages: list[dict], temperature: float = 0.4
                             if isinstance(text_value, str):
                                 text_parts.append(text_value.strip())
                     merged = " ".join(part for part in text_parts if part)
-                    return merged or None
+                    if merged:
+                        return merged
+                    logger.warning("llm_call_empty_text_parts model=%s", settings.llm_model)
+                    return None
 
+                logger.warning(
+                    "llm_call_unexpected_content model=%s type=%s",
+                    settings.llm_model,
+                    type(content).__name__,
+                )
                 return None
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code if exc.response is not None else None
             if status_code in retry_statuses and attempt < max_attempts - 1:
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
+            logger.warning(
+                "llm_call_http_error model=%s status=%s body=%s",
+                settings.llm_model,
+                status_code,
+                (exc.response.text[:200] if exc.response is not None else ""),
+            )
             return None
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
             if attempt < max_attempts - 1:
                 await asyncio.sleep(0.5 * (attempt + 1))
                 continue
+            logger.warning(
+                "llm_call_transport_error model=%s error=%s",
+                settings.llm_model,
+                type(exc).__name__,
+            )
             return None
-        except (KeyError, IndexError, ValueError, TypeError, AttributeError, json.JSONDecodeError):
+        except (KeyError, IndexError, ValueError, TypeError, AttributeError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "llm_call_parse_error model=%s error=%s",
+                settings.llm_model,
+                type(exc).__name__,
+            )
             return None
     return None
 
