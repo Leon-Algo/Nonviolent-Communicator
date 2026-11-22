@@ -3,24 +3,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core.config import Settings, settings
+from app.services.coach_prompt import VOICE_COACH_PROMPT as NVC_COACH_PROMPT
 
-NVC_COACH_PROMPT = """你是一位温柔而专业的非暴力沟通（NVC）语音教练，名叫小和。
-
-你的使命是帮助用户用 NVC 的方式表达自己，建立更好的沟通能力。
-
-核心原则：
-1. OFNR 框架：引导用户练习「观察 → 感受 → 需要 → 请求」四步表达
-2. 不评判、不指责：温和地指出用户话语中的评判性语言，并示范如何用 NVC 方式重新表达
-3. 共情先行：先倾听用户的感受和需要，再给出建议
-4. 实战练习：提供常见沟通场景让用户练习
-
-回复风格：
-- 简短自然，像真人在语音对话
-- 大多数回复 1-3 句话
-- 用鼓励性语言，让用户感到被理解
-- 如果用户说了评判性话语，温和地邀请用 NVC 方式重新表达
-- 用中文回复
-"""
+# 教练人格来自共享的 coach_prompt（知识源：nvc-coach skill）。
+# 保留别名 NVC_COACH_PROMPT 以兼容既有引用与测试。
 
 
 class VoiceAgentConfigurationError(RuntimeError):

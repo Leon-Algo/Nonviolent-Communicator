@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     llm_api_key: str | None = Field(default=None, alias="LLM_API_KEY")
     llm_model: str = Field(
-        default="Qwen/Qwen3-Coder-480B-A35B-Instruct", alias="LLM_MODEL"
+        default="Qwen/Qwen3.8-Flash-Next", alias="LLM_MODEL"
     )
     openai_base_url: str = Field(
         default="https://api-inference.modelscope.cn/v1", alias="OPENAI_BASE_URL"

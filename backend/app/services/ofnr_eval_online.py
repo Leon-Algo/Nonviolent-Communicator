@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable
@@ -23,8 +24,9 @@ OFNR_HINTS: dict[str, tuple[str, ...]] = {
 }
 UNSAFE_PATTERNS = (
     "后果自负",
-    "升级到",
-    "投诉",
+    "直接升级",
+    "就升级",
+    "立即投诉",
     "追责",
     "根本不专业",
     "垃圾",
@@ -65,7 +67,10 @@ def _is_safe_text(text: str) -> bool:
         return False
     if len(text) > 260:
         return False
-    return not _contains_any(text, UNSAFE_PATTERNS)
+    # 引号内是复述对方原话（NVC 观察式倾听的合法行为），不计入威胁判定。
+    # 只检查模型自己说出的部分，避免"听到你说'直接升级'我有点压力"被误判。
+    spoken = re.sub(r"[“\"『]([^”\"』]*)[”\"』]", "", text)
+    return not _contains_any(spoken, UNSAFE_PATTERNS)
 
 
 def _half_or_more(matched: int, total: int) -> bool:
