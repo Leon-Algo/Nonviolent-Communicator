@@ -11,7 +11,6 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_ENV = ROOT / ".env"
-QUICKSTART_ENV = ROOT / "agent-quickstart-python" / "server" / ".env.local"
 
 AGORA_REGIONAL_HOSTS = {
     "US": "api-us-west-1.agora.io",
@@ -51,7 +50,6 @@ def format_ips(ips: list[str]) -> str:
 
 def main() -> int:
     load_env_file(ROOT_ENV)
-    load_env_file(QUICKSTART_ENV)
 
     database_url = os.environ.get("DATABASE_URL", "")
     supabase_url = os.environ.get("SUPABASE_URL", "")

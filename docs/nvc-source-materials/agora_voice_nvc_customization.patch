@@ -1,0 +1,77 @@
+diff --git a/server/src/agent.py b/server/src/agent.py
+index ad897df..c803ded 100644
+--- a/server/src/agent.py
++++ b/server/src/agent.py
+@@ -14,11 +14,22 @@ from agora_agent.agentkit.vendors import DeepgramSTT, MiniMaxTTS, OpenAI
+ 
+ logger = logging.getLogger("uvicorn.error")
+ 
+-ADA_PROMPT = """You are Ada, an agentic developer advocate from Agora. You help developers understand and build with Agora's Conversational AI platform.
+-
+-Agora is a real-time communications company. The product you represent is the Agora Conversational AI Engine.
+-
+-If you do not know a specific fact about Agora, say so plainly and suggest checking docs.agora.io. Keep most replies to one or two sentences unless the user explicitly asks for more detail.
++NVC_COACH_PROMPT = """你是一位温柔而专业的非暴力沟通（NVC）语音教练，名叫小和。
++
++你的使命是帮助用户用 NVC 的方式表达自己，建立更好的沟通能力。
++
++核心原则：
++1. OFNR 框架：引导用户练习「观察 → 感受 → 需要 → 请求」四步表达
++2. 不评判、不指责：温和地指出用户话语中的评判性语言，并示范如何用 NVC 方式重新表达
++3. 共情先行：先倾听用户的感受和需要，再给出建议
++4. 实战练习：提供常见沟通场景（如：和同事沟通延期、与上级对齐优先级、跨团队协作冲突）让用户练习
++
++回复风格：
++- 简短自然，像真人在语音对话
++- 大多数回复 1-3 句话
++- 用鼓励性语言，让用户感到被理解
++- 如果用户说了评判性话语（如"你总是…"、"你不专业"），温和地邀请用 NVC 方式重新表达
++- 用中文回复
+ """
+ 
+ 
+@@ -35,7 +46,7 @@ class Agent:
+         self.app_certificate = os.getenv("AGORA_APP_CERTIFICATE")
+         self.greeting = os.getenv(
+             "AGENT_GREETING",
+-            "Hi there! I'm Ada, your virtual assistant from Agora. How can I help?",
++            "你好！我是小和，你的非暴力沟通语音教练。今天想练习什么场景呢？",
+         )
+ 
+         if not self.app_id or not self.app_certificate:
+@@ -75,8 +86,8 @@ class Agent:
+             temperature=0.7,
+             top_p=0.95,
+         )
+-        stt = DeepgramSTT(model="nova-3", language="en")
+-        tts = MiniMaxTTS(model="speech_2_6_turbo", voice_id="English_captivating_female1")
++        stt = DeepgramSTT(model="nova-3", language="zh")
++        tts = MiniMaxTTS(model="speech_2_6_turbo", voice_id="Chinese (Mandarin)_Warm_Girl")
+ 
+         # Optional BYOK example: replace the STT block above and set DEEPGRAM_API_KEY.
+         # stt = DeepgramSTT(api_key=os.getenv("DEEPGRAM_API_KEY"), model="nova-3", language="en")
+@@ -112,7 +123,7 @@ class Agent:
+ 
+         agora_agent = AgoraAgent(
+             client=self.client,
+-            instructions=ADA_PROMPT,
++            instructions=NVC_COACH_PROMPT,
+             greeting=self.greeting,
+             failure_message="Please wait a moment.",
+             max_history=50,
+@@ -208,5 +219,13 @@ class Agent:
+                     exc_info=True,
+                 )
+ 
+-        logger.info("Stopping Agora agent through client.stop_agent agent_id=%s", agent_id)
+-        await self.client.stop_agent(agent_id)
++        try:
++            logger.info("Stopping Agora agent through client.stop_agent agent_id=%s", agent_id)
++            await self.client.stop_agent(agent_id)
++        except Exception as e:
++            err_body = getattr(e, "body", None) or {}
++            err_detail = err_body.get("detail", "") if isinstance(err_body, dict) else ""
++            if "ErrConflict" in str(err_detail) or "shutting down" in str(err_detail):
++                logger.info("Agent already shutting down, treating as success agent_id=%s", agent_id)
++                return
++            raise
