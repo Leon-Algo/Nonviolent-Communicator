@@ -119,11 +119,14 @@
     <tr><td>修复「推荐句模板残留」bug</td><td>✅ 消息反馈里的 <code>next_best_sentence</code> 原先走旧规则模板（与用户输入无关）；现与对方回应并发调用 LLM 改写（<code>asyncio.gather</code>），规则仅兜底。实测推荐句已贴合用户原句并贯通到总结</td></tr>
     <tr><td>RLS 隔离检查 7/7</td><td>✅ 脚本原先必失败（邮箱确认开启 + 匿名注册触发限流 429）。按 AGENTS.md 官方方案改用 service-role admin API 建预确认用户，并绕开重复 <code>apikey</code> 头导致的 401</td></tr>
     <tr><td>JWT smoke 7/7</td><td>✅ 同样加 admin API 建户兜底；对本地 <code>AUTH_MODE=supabase</code> 后端全过（含消息幂等、历史、周进度）</td></tr>
+    <tr><td>真实浏览器 E2E 15/15（23:50 轮）</td><td>✅ Playwright 驱动本机 Chrome（官方 channel=<code>chrome</code> + 假麦克风），完整用户路径：注册→登录→建场景→2 轮真实 LLM 对练→行动卡→复盘→周进度→语音创建→RTC 加入→正常结束。零页面 JS 错误、一方网络请求零失败。脚本入库 <code>scripts/browser_e2e_check.py</code>，可重复执行</td></tr>
+    <tr><td>修复语音链路 2 个真 bug</td><td>✅ ① 官方 Agora toolkit 浏览器包残留 <code>process.env</code> 直接抛 ReferenceError 打断语音初始化——补标准 process shim；② RTM 订阅默认带 presence 在受限网络抛 -13001 且 800ms 等待窗口过短，整条语音被拖死——改为等待真实连接状态（最长 15s）+ <code>withPresence:false</code> + RTM 失败降级纯 RTC</td></tr>
+    <tr><td>移除 Google Fonts 依赖</td><td>✅ fonts.gstatic.com 对国内用户不可达且中断请求拖慢首屏；改系统字体栈（PingFang/微软雅黑等），SW_VERSION v12→v13（按缓存策略规范）</td></tr>
   </table>
 
   <h2>五-B、明确的遗留局限（非 bug，需知晓）</h2>
   <ul>
-    <li><strong>浏览器 UI 点击路径未走完</strong>：内置浏览器控制器截图缓存与 DOM 快照不稳定，自动点击/滚动不可靠。已通过浏览器验证：页面加载无白屏、品牌正确、PWA 就绪、前后端配置与 <code>.env</code> 对齐（2026-07-12 事故根因未复现）、mock 模式就绪。完整点击路径需人工在 <code>http://127.0.0.1:8081</code> 复验（本地服务保留运行中）；线上浏览器 E2E 仍是发布前置项（当前网络下线上域名不可达）。</li>
+    <li><strong>浏览器 UI 点击路径已自动化闭环（23:50 更新）</strong>：改用 Playwright 官方 Chrome 通道后完整用户路径 15/15 全过，此前内置浏览器控制器不稳定的问题已绕开。剩余环境限制：① Agora RTM 信令与遥测节点在当前网络不可达（RTC 音频已实测连通，转录同步在纯 RTC 模式下不可用，正常网络下自动恢复）；② 线上域名（vercel/pages.dev）仍需网络可达后用同一脚本把 <code>E2E_FRONTEND/E2E_API_BASE</code> 指向线上地址复跑一遍。</li>
     <li><strong>原书内容不入库（合规边界）</strong>：用户提供的扫描 PDF（205 页，含"霏凡论坛"水印）与追加的文本电子版（epub/mobi/pdf/txt）均来自非出版社官方渠道，仅用于<strong>本地核对与精校</strong>。skill 只保留按教练场景转述的短案例与关键措辞（均标注"原书案例"），<strong>未复制整章原文进仓库</strong>；仓库中可传播来源是 CNVC 官方公开 Introductory Reference PDF。这一轮已用文本电子版完成原书真实案例精校，上一轮"案例为自编示范"的局限已消除。</li>
     <li><strong>在线评测 overall=0.86</strong>：仅因 <code>rewrite_keywords</code> 旧词表对同义表达扣分，case 级全过；改成语义 judge 会动评测契约、影响历史可比性，按"主线不跑偏就不动"原则保留现状。</li>
   </ul>
