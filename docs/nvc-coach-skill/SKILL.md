@@ -1,15 +1,15 @@
 ---
 name: nvc-coach
-description: "非暴力沟通（NVC）教练知识库与工作台。基于马歇尔·卢森堡《Nonviolent Communication: A Language of Life》的结构化提炼。用于：当用户要练习非暴力沟通、分析一句话的 OFNR 四要素、把评判性表达改写成 NVC 表达、扮演沟通对象陪练、处理愤怒/冲突/羞耻、或提供 NVC 反馈时使用。产出的是基于原书框架的判断与示范，不是泛泛的沟通建议。"
+description: "非暴力沟通（NVC）教练知识库与工作台。依据马歇尔·卢森堡《非暴力沟通》（华夏出版社中文版）13 章目录逐章对齐的结构化提炼，附录产品扩展章节。用于：当用户要练习非暴力沟通、分析一句话的 OFNR 四要素、把评判性表达改写成 NVC 表达、扮演沟通对象陪练、处理愤怒/冲突/羞耻、或提供 NVC 反馈时使用。产出的是基于原书框架的判断与示范，不是泛泛的沟通建议。"
 ---
 
 <!-- argument-hint: [场景描述 / 一句话表达 / 框架名 / 章节号] -->
 
 # 非暴力沟通教练（NVC Coach）
 
-**来源**：Marshall Rosenberg, *Nonviolent Communication: A Language of Life*
+**来源**：Marshall Rosenberg《非暴力沟通》（华夏出版社，2009）；章节编号按该书中文版目录逐章对齐
 **形态**：结构化知识库 + 可执行教练流程
-**生成**：2026-11-22 | **章节**：14 | **用途**：产品内核知识源 / Agent 按需加载
+**生成**：2026-11-22 | **章节**：13 原书章 + 2 产品扩展 | **用途**：产品内核知识源 / Agent 按需加载
 
 ## 如何使用本 Skill
 
@@ -82,7 +82,7 @@ NVC 不是"说话技巧"，是把注意力放在**linkages（联结）**上：�
 - 用猜测式表达："听起来你感到…，因为你需要…，是吗？"——用疑问句留出让对方修正的空间。
 - 当对方感到被听见，防御会下降，才可能谈请求。
 
-**教练 적용**：用户发来的每句话，都先同理其感受与需要，再引导改写。不要上来就纠错。
+**教练应用**：用户发来的每句话，都先同理其感受与需要，再引导改写。不要上来就纠错。
 
 ### 6. 自我同理（情绪来了先向内走）
 
@@ -129,22 +129,25 @@ NVC 不是"说话技巧"，是把注意力放在**linkages（联结）**上：�
 
 ## 章节索引
 
-| # | 标题 | 关键框架 |
+章节编号与原书中文版目录一一对应（第 1-13 章）；标注「产品扩展」的两章是基于原书框架整理的操作专题，非原书章节。
+
+| # | 标题（对应原书） | 关键框架 |
 |---|---|---|
-| [ch01](chapters/ch01-purpose.md) | 目的与意图 | 联结、两个问题 |
-| [ch02](chapters/ch02-alienation.md) | 异化的沟通方式 | 四种评判、责任 |
-| [ch03](chapters/ch03-observation.md) | 区分观察与评论 | 录像机测试 |
-| [ch04](chapters/ch04-feelings.md) | 区分感受与想法 | 感受词表、信号词 |
-| [ch05](chapters/ch05-needs.md) | 感受的根源 | 需要vs刺激、负责 |
-| [ch06](chapters/ch06-requests.md) | 提出具体请求 | 请求vs命令 |
-| [ch07](chapters/ch07-empathy.md) | 同理心倾听 | 猜测式回应 |
-| [ch08](chapters/ch08-self-empathy.md) | 培养自我同理 | 三层停顿 |
-| [ch09](chapters/ch09-anger.md) | 愤怒的处理 | 愤怒四步 |
-| [ch10](chapters/ch10-shame.md) | 羞耻、内疚与恐惧 | 应当句式、自我宽恕 |
-| [ch11](chapters/ch11-coercion.md) | 强制力的代价 | 惩罚奖励、服从 |
-| [ch12](chapters/ch12-gratitude.md) | 感恩的表达 | 感谢三步 |
-| [ch13](chapters/ch13-conflict.md) | 冲突解决与调解 | 需要翻译、策略分歧 |
-| [ch14](chapters/ch14-practice.md) | 教练实践流程 | 一次一步、示范 |
+| [ch01](chapters/ch01-purpose.md) | 1 让爱融入生活 | 联结、两个问题 |
+| [ch02](chapters/ch02-alienation.md) | 2 是什么蒙蔽了爱 | 四种异化沟通、责任 |
+| [ch03](chapters/ch03-observation.md) | 3 区分观察和评论 | 录像机测试 |
+| [ch04](chapters/ch04-feelings.md) | 4 体会和表达感受 | 感受词表、信号词 |
+| [ch05](chapters/ch05-needs.md) | 5 感受的根源 | 需要vs刺激、负责 |
+| [ch06](chapters/ch06-requests.md) | 6 请求帮助 | 请求vs命令 |
+| [ch07](chapters/ch07-empathy.md) | 7 用全身心倾听 | 猜测式回应、四要素倾听 |
+| [ch08](chapters/ch08-listening-power.md) | 8 倾听的力量 | 疗愈力、倾听愤怒、请求倾听 |
+| [ch09](chapters/ch09-self-empathy.md) | 9 爱自己 | 三层停顿、哀悼、我选择、自我宽恕 |
+| [ch10](chapters/ch10-anger.md) | 10 充分表达愤怒 | 愤怒四步、表达前先同理 |
+| [ch11](chapters/ch11-coercion.md) | 11 运用强制力避免伤害 | 保护性vs惩罚性、服从代价 |
+| [ch12](chapters/ch12-passion.md) | 12 重获生活的热情 | 哀悼未完成、不得不→我选择 |
+| [ch13](chapters/ch13-gratitude.md) | 13 表达感激 | 感谢三步、庆祝 |
+| [ch14](chapters/ch14-practice.md)（产品扩展） | 教练实践流程 | 一次一步、示范 |
+| [ch15](chapters/ch15-conflict.md)（产品扩展） | 冲突解决与调解 | 需要翻译、策略分歧 |
 
 ## 主题索引
 
@@ -154,16 +157,16 @@ NVC 不是"说话技巧"，是把注意力放在**linkages（联结）**上：�
 - **需要与策略** → ch05
 - **请求与命令** → ch06
 - **倾听 / 同理心** → ch07
-- **倾听的力量 / 疗愈 / 请求倾听 / 倾听愤怒** → ch07
-- **自我同理 / 情绪管理** → ch08, ch09, ch10
-- **哀悼 / 应当思维（have to→choose to）** → ch08, ch10
+- **倾听的力量 / 疗愈 / 请求倾听 / 倾听愤怒** → ch08
+- **自我同理 / 爱自己 / 情绪管理** → ch09
+- **哀悼 / 应当思维（have to→choose to）/ 自我宽恕 / 羞耻内疚** → ch09, ch12
 - **保护性强制力 vs 惩罚性强制力** → ch11
-- **愤怒** → ch09
-- **羞耻 / 内疚 / 恐惧** → ch10
+- **愤怒** → ch10
 - **惩罚 / 奖励 / 权力** → ch11
-- **感恩** → ch12
-- **冲突 / 调解** → ch13
-- **如何教练别人** → ch14
+- **重获热情 / 行尸走肉式生活** → ch12
+- **感恩** → ch13
+- **冲突 / 调解** → ch15（产品扩展）
+- **如何教练别人** → ch14（产品扩展）
 
 ## 支撑文件
 

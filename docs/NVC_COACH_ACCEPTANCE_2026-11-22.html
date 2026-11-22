@@ -47,7 +47,7 @@
 <div class="wrap">
 
   <h1>好好说 · 教练内核验收报告</h1>
-  <div class="sub">2026-11-22 · 分支 main · 目标：把《非暴力沟通》打磨成真正的教练内核 · 本轮含真实模型链路验证</div>
+  <div class="sub">2026-11-22 · 分支 main · 目标：把《非暴力沟通》打磨成真正的教练内核 · 含真实模型链路验证 + 原书目录逐章精校</div>
 
   <div class="card crit">
     <span class="tag t-bad">本轮最重要发现</span>
@@ -65,6 +65,8 @@
     <tr><td>测试隔离修复</td><td>6 处 <code>Settings(...)</code> 构造加 <code>_env_file=None</code>，根 <code>.env</code> 不再污染单测</td></tr>
     <tr><td>品牌落地</td><td>「好好说 · 非暴力沟通对练」+ slogan"吵架前，先好好说"。title / manifest / README / PRD 同步，SW v11→v12</td></tr>
     <tr><td>skill 补强</td><td>新增 CNVC 官方完整感受/需要词表（<code>feelings_needs_inventory.md</code>），SKILL.md 已引用</td></tr>
+    <tr><td>原书目录逐章精校</td><td>用户提供《非暴力沟通》中文版 PDF（华夏出版社，205 页扫描版）。以其目录页权威文本对齐 13 章：修正 ch08-ch13 的编号错位；补齐缺章第 8 章「倾听的力量」、第 12 章「重获生活的热情」；把自我宽恕/羞耻内疚并入第 9 章「爱自己」；产品扩展的教练流程/冲突专题另编 ch14/ch15 并明确标注</td></tr>
+    <tr><td>运行时副本同步</td><td><code>~/.agents/skills/nvc-coach</code> 与入库权威副本 rsync 一致（20 文件），Agent 加载路径已更新</td></tr>
     <tr><td>临时文件清理</td><td>删除遗留的 <code>.env.bak.*</code> 备份（含 7 月旧备份），按"不留冗余备份"约定</td></tr>
   </table>
 
@@ -100,8 +102,8 @@
     <tr><td>复用官方能力、不造轮子</td><td><span class="tag t-good">达成</span>模型走官方 ModelScope 接口；词表用 CNVC 官方清单；评测走项目原生脚本</td></tr>
     <tr><td>快速跑通、无漏洞无 bug</td><td><span class="tag t-good">达成</span>发现并修复 4 个真 bug（模型下线/超时/安全误判/测试隔离），45 测试全绿</td></tr>
     <tr><td>品牌改掉"橘晴"</td><td><span class="tag t-good">达成</span>定为「好好说」并全局落地，无残留</td></tr>
-    <tr><td>整本书转化成教练</td><td><span class="tag t-good">达成</span>skill 已 19 文件、逐章对齐原书 13 章 + 教练扩展章；CNVC 官方词表已纳入；权威副本已入库可追踪</td></tr>
-    <tr><td>提交与同步</td><td><span class="tag t-good">达成</span>6 个 commit 全部推送 origin/main，本地/远程 0 分叉</td></tr>
+    <tr><td>整本书转化成教练</td><td><span class="tag t-good">达成</span>skill 20 文件、13 章按原书中文版目录逐章对齐 + 2 个产品扩展章；CNVC 官方词表已纳入；权威副本入库、运行时副本已同步</td></tr>
+    <tr><td>提交与同步</td><td><span class="tag t-good">达成</span>上轮 7 个 commit 已推送 origin/main；本轮精校改动将追加提交并同步，本地/远程保持 0 分叉</td></tr>
   </table>
 
   <h2>五、本轮全部完成项（原待办已清空）</h2>
@@ -110,13 +112,13 @@
     <tr><td>提交本轮改动</td><td>✅ 6 个 commit：真实链路修复 / 测试隔离 / 品牌+报告 / 异常可观测性 / 嵌套仓库清理 / skill 入库</td></tr>
     <tr><td>异常可观测性</td><td>✅ LLM 所有失败路径打结构化 WARNING（model/status/错误类型），坏模型名实测已能告警</td></tr>
     <tr><td>嵌套仓库了结</td><td>✅ 迁移诊断脚本依赖 → 归档本地 patch → 删除 19000 文件冗余目录，省空间、去误提交风险</td></tr>
-    <tr><td>skill 入库</td><td>✅ 权威副本纳入 <code>docs/nvc-coach-skill/</code>（19 文件），Git 可追踪、团队可获取</td></tr>
-    <tr><td>逐章对齐原书</td><td>✅ 补齐 4 处权威缺口：保护性 vs 惩罚性强制力 / 表达愤怒前先同理 / 哀悼与 have-to→choose-to / 倾听的力量（疗愈/请求倾听/倾听愤怒）</td></tr>
+    <tr><td>skill 入库</td><td>✅ 权威副本纳入 <code>docs/nvc-coach-skill/</code>（20 文件），Git 可追踪、团队可获取；运行时副本逐文件一致</td></tr>
+    <tr><td>逐章对齐原书</td><td>✅ 以原书中文版目录为准重排章节：13 章编号一一对应；补齐第 8 章「倾听的力量」、第 12 章「重获生活的热情」；自我宽恕/羞耻内疚归入第 9 章；修正全部交叉引用</td></tr>
   </table>
 
   <h2>五-B、明确的遗留局限（非 bug，需知晓）</h2>
   <ul>
-    <li><strong>原书全文未纳入</strong>：网上中文整书 PDF 均为网盘盗版站，按合规要求未下载未传播。技能骨架已对齐原书 13 章全部框架，词表用 CNVC 官方公开材料，且已抓到官方 Introductory Reference PDF 存证。若你提供合法电子书，可做含原书案例的逐章精校版。</li>
+    <li><strong>原书正文案例未逐字提取</strong>：用户提供的 PDF 是 205 页纯扫描版，正文无文本层（仅目录页有文字），当前环境缺中文 OCR 引擎，因此本次对齐以<strong>目录页权威文本 + 公开框架</strong>为准，案例为按原书框架自行编写的示范，不是原文摘录。该 PDF 含"霏凡论坛"水印，来源非出版社官方渠道，仅用于本地核对章节结构，<strong>未复制进仓库</strong>；仓库中保留 CNVC 官方公开 Introductory Reference PDF 作为可传播来源。如需逐字案例精校，需要可搜索文本的合法电子书。</li>
     <li><strong>在线评测 overall=0.86</strong>：仅因 <code>rewrite_keywords</code> 旧词表对同义表达扣分，case 级全过；改成语义 judge 会动评测契约、影响历史可比性，按"主线不跑偏就不动"原则保留现状。</li>
   </ul>
 
@@ -138,7 +140,7 @@ python3 -c "import json; json.load(open('web/manifest.webmanifest'))"
 grep -rn 'NVC Practice Coach\|橘晴' web/index.html web/manifest.webmanifest README.md docs/PRD.md</code></pre>
 
   <div class="footer">
-    报告生成：2026-11-22 · 所有改动位于工作区，尚未提交 · 真实模型调用已获授权，成本可忽略 · 未打印任何密钥值
+    报告生成/更新：2026-11-22 · 真实模型调用已获授权，成本可忽略 · 未打印任何密钥值 · 原书 PDF 仅用于本地目录核对，未入库
   </div>
 
 </div>
