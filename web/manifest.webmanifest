@@ -1,7 +1,7 @@
 {
-  "name": "NVC Practice Coach",
-  "short_name": "NVC Coach",
-  "description": "非暴力沟通练习应用，支持场景对练、行动卡与复盘。",
+  "name": "好好说 · 非暴力沟通对练",
+  "short_name": "好好说",
+  "description": "吵架前，先好好说。用非暴力沟通练习把话说清楚、把关系处舒服。支持场景对练、行动卡与复盘。",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

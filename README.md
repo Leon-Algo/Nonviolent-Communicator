@@ -1,4 +1,6 @@
-# Nonviolent-Communicator
+# 好好说 · 非暴力沟通对练
+
+> 吵架前，先好好说。
 
 NVC（Nonviolent Communication）练习产品的 MVP 仓库。
 当前目标是让用户通过“登录 -> 对练 -> 复盘”的 3 步流程，形成可迁移到真实对话的沟通能力。

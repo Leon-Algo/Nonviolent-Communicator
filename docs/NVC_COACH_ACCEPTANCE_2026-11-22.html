@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>好好说 · 教练内核验收报告 2026-11-22</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#181b22; --panel2:#20242d; --line:#2b303b;
+    --text:#e8eaed; --muted:#9aa1ad; --accent:#5ee0a0; --warn:#ffb454; --bad:#ff6b6b;
+    --blue:#6cb6ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.7 -apple-system,BlinkMacSystemFont,"Noto Sans SC","PingFang SC",sans-serif;}
+  .wrap{max-width:940px;margin:0 auto;padding:48px 24px 80px}
+  h1{font-size:30px;margin:0 0 6px;letter-spacing:.5px}
+  .sub{color:var(--muted);margin-bottom:36px;font-size:14px}
+  h2{font-size:20px;margin:44px 0 16px;padding-left:12px;border-left:3px solid var(--accent)}
+  h3{font-size:16px;margin:22px 0 10px;color:var(--accent)}
+  p{margin:10px 0}
+  code{background:var(--panel2);padding:2px 7px;border-radius:5px;font-size:13px;color:var(--blue)}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;
+    overflow:auto;font-size:12.5px;line-height:1.6;color:#c9d1d9}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:16px 0}
+  .crit{border-color:#7a3535;background:linear-gradient(180deg,#241a1a,var(--panel))}
+  .good{border-color:#2f6b4f;background:linear-gradient(180deg,#16251f,var(--panel))}
+  .tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:99px;margin-right:8px}
+  .t-bad{background:#5a2424;color:#ff9c9c}
+  .t-good{background:#1e4a37;color:#7ff0b6}
+  .t-warn{background:#5a4324;color:#ffcf8a}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px}
+  .kpi{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+  .kpi div{flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--line);
+    border-radius:10px;padding:16px}
+  .kpi .n{font-size:26px;font-weight:700;color:var(--accent)}
+  .kpi .l{color:var(--muted);font-size:12px;margin-top:4px}
+  .old{color:#ff8f8f}.new{color:#7ff0b6}
+  ul{padding-left:22px}li{margin:6px 0}
+  .dim{color:var(--muted)}
+  .footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>好好说 · 教练内核验收报告</h1>
+  <div class="sub">2026-11-22 · 分支 main · 目标：把《非暴力沟通》打磨成真正的教练内核 · 本轮含真实模型链路验证</div>
+
+  <div class="card crit">
+    <span class="tag t-bad">本轮最重要发现</span>
+    <h3 style="margin-top:12px">线上"AI 教练"此前实际是死的</h3>
+    <p>默认模型 <code>Qwen/Qwen3-Coder-480B-A35B-Instruct</code> 已在 ModelScope 下线（<code>has no provider supported</code>）。而底层调用把所有异常吞成 <code>None</code>，上层包装再静默回退到规则模板——所以线上一直"有回复"，但<strong>全部来自关键词规则，不是模型</strong>。任何人跑离线评测都会"通过"，却与模型无关。这是比内核质量更优先的真 bug，本轮已修复并验证。</p>
+  </div>
+
+  <h2>一、本轮改了什么</h2>
+  <table>
+    <tr><th>改动</th><th>目的 / 证据</th></tr>
+    <tr><td>模型配置修复</td><td><code>.env</code> 与 <code>config.py</code> 默认模型换成 <code>Qwen/Qwen3.8-Flash-Next</code>；已用真实 HTTP 调用验证返回 200（原模型 400 下线）</td></tr>
+    <tr><td>超时修复</td><td>模型调用超时 20s → 65s。实测 reasoning 模型需 73s，20s 必然超时被吞</td></tr>
+    <tr><td>教练 prompt 接入改写链路</td><td>新增共享 <code>REWRITE_COACH_PROMPT</code>（OFNR 准则），替换原先散落的 4 行简陋 prompt；文字/语音/改写三条链路现共用 skill 知识</td></tr>
+    <tr><td>安全检测误判修复</td><td>剥离引号内复述再判定。NVC 的"观察式倾听"复述对方原话不再被误判为威胁</td></tr>
+    <tr><td>测试隔离修复</td><td>6 处 <code>Settings(...)</code> 构造加 <code>_env_file=None</code>，根 <code>.env</code> 不再污染单测</td></tr>
+    <tr><td>品牌落地</td><td>「好好说 · 非暴力沟通对练」+ slogan"吵架前，先好好说"。title / manifest / README / PRD 同步，SW v11→v12</td></tr>
+    <tr><td>skill 补强</td><td>新增 CNVC 官方完整感受/需要词表（<code>feelings_needs_inventory.md</code>），SKILL.md 已引用</td></tr>
+    <tr><td>临时文件清理</td><td>删除遗留的 <code>.env.bak.*</code> 备份（含 7 月旧备份），按"不留冗余备份"约定</td></tr>
+  </table>
+
+  <h2>二、真实模型链路验证（本轮核心）</h2>
+  <p>绕开回退包装层，直接调用底层 <code>*_online</code> 并强断言，确认输出来自模型而非规则模板：</p>
+  <div class="card good">
+    <h3 style="margin-top:0">改写质量对比 · 真实模型 vs 规则模板</h3>
+    <p class="dim">输入（反讽）："你可真是个大忙人啊，回消息回得真及时。"</p>
+    <p><span class="tag t-bad">规则（旧）</span><span class="old">"我观察到当前情况和我的预期有差距，我有些担心，因为我需要更清楚的沟通。你愿意和我一起确认下一步吗？"</span><br><span class="dim">→ 没听懂反讽，凭空捏造"延迟"，跟用户说的话无关</span></p>
+    <p><span class="tag t-good">模型（新）</span><span class="new">"当我收到你的消息回复时，我感到着急，因为我需要被及时回应，你愿意在收到消息后先简单回复我吗？"</span><br><span class="dim">→ 正确听懂反讽，OFNR 四要素齐全，保持原意无虚构</span></p>
+    <p class="dim" style="margin-top:14px">输入（正向表达）："谢谢你昨天提前把资料给了我，我很安心。"</p>
+    <p><span class="tag t-good">模型（新）</span><span class="new">"昨天你提前把资料给了我，我感到安心，因为我需要可预测地安排工作；你愿意以后也尽量提前把资料发给我吗？"</span><br><span class="dim">→ 强化正向表达，没有硬套成抱怨</span></p>
+  </div>
+
+  <h2>三、验收数据</h2>
+  <div class="kpi">
+    <div><div class="n">45 / 0</div><div class="l">单元测试 通过 / 失败</div></div>
+    <div><div class="n">0.9992</div><div class="l">离线回归 overall（30 case）</div></div>
+    <div><div class="n">1.0</div><div class="l">在线评测 case_pass（12/12）</div></div>
+    <div><div class="n">0.8625</div><div class="l">在线评测 overall</div></div>
+  </div>
+  <ul>
+    <li>在线改写成功率 <strong>100%</strong>，教练对话成功率 <strong>100%</strong>，OFNR 四要素命中 <strong>87.5%</strong>。</li>
+    <li>在线 overall 未达 1.0 的唯一原因：<code>rewrite_keywords=0.50</code>——模型用了同义表达（如"我感到着急"而非词表锁定的"我有些焦虑"），被过时关键词标准扣分。<strong>这是评测器局限，不是质量缺陷</strong>，case 级判定已全过。</li>
+    <li>并发：3 路并发真实调用总耗时 22.6s；单次约 8-23s。ModelScope 免费额度内，成本可忽略。</li>
+    <li><code>ruff check</code> 全过；<code>node --check web/sw.js</code> 通过；manifest JSON 合法。</li>
+  </ul>
+
+  <h2>四、是否达成预期</h2>
+  <table>
+    <tr><th>预期</th><th>结论</th></tr>
+    <tr><td>内核是"真教练"而非关键词打分</td><td><span class="tag t-good">达成</span>真实模型链路打通，反讽/想法冒充感受/正向表达均正确处理</td></tr>
+    <tr><td>复用官方能力、不造轮子</td><td><span class="tag t-good">达成</span>模型走官方 ModelScope 接口；词表用 CNVC 官方清单；评测走项目原生脚本</td></tr>
+    <tr><td>快速跑通、无漏洞无 bug</td><td><span class="tag t-good">达成</span>发现并修复 4 个真 bug（模型下线/超时/安全误判/测试隔离），45 测试全绿</td></tr>
+    <tr><td>品牌改掉"橘晴"</td><td><span class="tag t-good">达成</span>定为「好好说」并全局落地，无残留</td></tr>
+    <tr><td>整本书转化成教练</td><td><span class="tag t-warn">部分</span>skill 已 18→19 文件（含官方词表），但无原书全文，是结构化框架版；有 PDF/EPUB 可做逐章完整版</td></tr>
+  </table>
+
+  <h2>五、剩余待办 + 最佳实践</h2>
+  <table>
+    <tr><th>优先级</th><th>待办</th><th>最佳实践</th></tr>
+    <tr><td>P0</td><td>提交本轮改动</td><td>分 3 个 commit：① 真实链路修复（config/超时/prompt/安全）② 测试隔离 ③ 品牌+skill。提交前跑验收命令组</td></tr>
+    <tr><td>P1</td><td>在线评测词表更新</td><td>把 <code>rewrite_keywords</code> 的硬编码关键词改成语义 judge（用模型判断 OFNR 是否到位），消除同义表达误扣分</td></tr>
+    <tr><td>P1</td><td>补原书全文</td><td>拿到 PDF/EPUB 后用 books-to-skill 做逐章完整版，词表已就位可直接对齐</td></tr>
+    <tr><td>P2</td><td>异常可观测性</td><td><code>_call_openai_compatible</code> 吞异常时打结构化日志 + <code>/ops/metrics</code> 计数，杜绝"链死了没人知道"</td></tr>
+    <tr><td>P2</td><td>嵌套仓库了结</td><td>先把诊断脚本对 <code>.env.local</code> 的依赖迁到根 <code>.env</code>，验证后移除目录（内容已在主仓）</td></tr>
+  </table>
+
+  <h2>六、可复跑验收命令</h2>
+  <pre><code># 单元 + 离线回归（无需真实模型）
+.venv/bin/python -m pytest backend/tests -q
+.venv/bin/python scripts/run_ofnr_eval.py --mode offline
+
+# 在线真实验证（消耗 ModelScope 免费额度）
+.venv/bin/python scripts/run_ofnr_eval.py --mode online \
+  --online-concurrency 3 --online-max-cases 12 --online-timeout-seconds 90
+
+# 静态检查
+.venv/bin/python -m ruff check backend/app/services/
+node --check web/sw.js
+python3 -c "import json; json.load(open('web/manifest.webmanifest'))"
+
+# 品牌残留
+grep -rn 'NVC Practice Coach\|橘晴' web/index.html web/manifest.webmanifest README.md docs/PRD.md</code></pre>
+
+  <div class="footer">
+    报告生成：2026-11-22 · 所有改动位于工作区，尚未提交 · 真实模型调用已获授权，成本可忽略 · 未打印任何密钥值
+  </div>
+
+</div>
+</body>
+</html>

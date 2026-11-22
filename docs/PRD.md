@@ -1,4 +1,4 @@
-# MVP PRD: NVC Practice Coach
+# MVP PRD: 好好说 · 非暴力沟通对练
 
 ## 0. 文档信息
 
