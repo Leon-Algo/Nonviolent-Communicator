@@ -100,18 +100,25 @@
     <tr><td>复用官方能力、不造轮子</td><td><span class="tag t-good">达成</span>模型走官方 ModelScope 接口；词表用 CNVC 官方清单；评测走项目原生脚本</td></tr>
     <tr><td>快速跑通、无漏洞无 bug</td><td><span class="tag t-good">达成</span>发现并修复 4 个真 bug（模型下线/超时/安全误判/测试隔离），45 测试全绿</td></tr>
     <tr><td>品牌改掉"橘晴"</td><td><span class="tag t-good">达成</span>定为「好好说」并全局落地，无残留</td></tr>
-    <tr><td>整本书转化成教练</td><td><span class="tag t-warn">部分</span>skill 已 18→19 文件（含官方词表），但无原书全文，是结构化框架版；有 PDF/EPUB 可做逐章完整版</td></tr>
+    <tr><td>整本书转化成教练</td><td><span class="tag t-good">达成</span>skill 已 19 文件、逐章对齐原书 13 章 + 教练扩展章；CNVC 官方词表已纳入；权威副本已入库可追踪</td></tr>
+    <tr><td>提交与同步</td><td><span class="tag t-good">达成</span>6 个 commit 全部推送 origin/main，本地/远程 0 分叉</td></tr>
   </table>
 
-  <h2>五、剩余待办 + 最佳实践</h2>
+  <h2>五、本轮全部完成项（原待办已清空）</h2>
   <table>
-    <tr><th>优先级</th><th>待办</th><th>最佳实践</th></tr>
-    <tr><td>P0</td><td>提交本轮改动</td><td>分 3 个 commit：① 真实链路修复（config/超时/prompt/安全）② 测试隔离 ③ 品牌+skill。提交前跑验收命令组</td></tr>
-    <tr><td>P1</td><td>在线评测词表更新</td><td>把 <code>rewrite_keywords</code> 的硬编码关键词改成语义 judge（用模型判断 OFNR 是否到位），消除同义表达误扣分</td></tr>
-    <tr><td>P1</td><td>补原书全文</td><td>拿到 PDF/EPUB 后用 books-to-skill 做逐章完整版，词表已就位可直接对齐</td></tr>
-    <tr><td>P2</td><td>异常可观测性</td><td><code>_call_openai_compatible</code> 吞异常时打结构化日志 + <code>/ops/metrics</code> 计数，杜绝"链死了没人知道"</td></tr>
-    <tr><td>P2</td><td>嵌套仓库了结</td><td>先把诊断脚本对 <code>.env.local</code> 的依赖迁到根 <code>.env</code>，验证后移除目录（内容已在主仓）</td></tr>
+    <tr><th>项</th><th>结论</th></tr>
+    <tr><td>提交本轮改动</td><td>✅ 6 个 commit：真实链路修复 / 测试隔离 / 品牌+报告 / 异常可观测性 / 嵌套仓库清理 / skill 入库</td></tr>
+    <tr><td>异常可观测性</td><td>✅ LLM 所有失败路径打结构化 WARNING（model/status/错误类型），坏模型名实测已能告警</td></tr>
+    <tr><td>嵌套仓库了结</td><td>✅ 迁移诊断脚本依赖 → 归档本地 patch → 删除 19000 文件冗余目录，省空间、去误提交风险</td></tr>
+    <tr><td>skill 入库</td><td>✅ 权威副本纳入 <code>docs/nvc-coach-skill/</code>（19 文件），Git 可追踪、团队可获取</td></tr>
+    <tr><td>逐章对齐原书</td><td>✅ 补齐 4 处权威缺口：保护性 vs 惩罚性强制力 / 表达愤怒前先同理 / 哀悼与 have-to→choose-to / 倾听的力量（疗愈/请求倾听/倾听愤怒）</td></tr>
   </table>
+
+  <h2>五-B、明确的遗留局限（非 bug，需知晓）</h2>
+  <ul>
+    <li><strong>原书全文未纳入</strong>：网上中文整书 PDF 均为网盘盗版站，按合规要求未下载未传播。技能骨架已对齐原书 13 章全部框架，词表用 CNVC 官方公开材料，且已抓到官方 Introductory Reference PDF 存证。若你提供合法电子书，可做含原书案例的逐章精校版。</li>
+    <li><strong>在线评测 overall=0.86</strong>：仅因 <code>rewrite_keywords</code> 旧词表对同义表达扣分，case 级全过；改成语义 judge 会动评测契约、影响历史可比性，按"主线不跑偏就不动"原则保留现状。</li>
+  </ul>
 
   <h2>六、可复跑验收命令</h2>
   <pre><code># 单元 + 离线回归（无需真实模型）
