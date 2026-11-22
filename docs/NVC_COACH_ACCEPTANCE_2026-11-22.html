@@ -115,10 +115,15 @@
     <tr><td>嵌套仓库了结</td><td>✅ 迁移诊断脚本依赖 → 归档本地 patch → 删除 19000 文件冗余目录，省空间、去误提交风险</td></tr>
     <tr><td>skill 入库</td><td>✅ 权威副本纳入 <code>docs/nvc-coach-skill/</code>（20 文件），Git 可追踪、团队可获取；运行时副本逐文件一致</td></tr>
     <tr><td>逐章对齐原书</td><td>✅ 以原书中文版目录为准重排章节：13 章编号一一对应；补齐第 8 章「倾听的力量」、第 12 章「重获生活的热情」；自我宽恕/羞耻内疚归入第 9 章；修正全部交叉引用</td></tr>
+    <tr><td>端到端真实链路验证（21:00 轮）</td><td>✅ 本地起服务：mock 认证 + 真实 Supabase DB + 真实 LLM + Agora 语音 token。场景→会话→消息→语音启停→总结→复盘→周进度全链路 200，周进度计数正确（练习 2/总结 1/真实应用 1/均分 4.0）</td></tr>
+    <tr><td>修复「推荐句模板残留」bug</td><td>✅ 消息反馈里的 <code>next_best_sentence</code> 原先走旧规则模板（与用户输入无关）；现与对方回应并发调用 LLM 改写（<code>asyncio.gather</code>），规则仅兜底。实测推荐句已贴合用户原句并贯通到总结</td></tr>
+    <tr><td>RLS 隔离检查 7/7</td><td>✅ 脚本原先必失败（邮箱确认开启 + 匿名注册触发限流 429）。按 AGENTS.md 官方方案改用 service-role admin API 建预确认用户，并绕开重复 <code>apikey</code> 头导致的 401</td></tr>
+    <tr><td>JWT smoke 7/7</td><td>✅ 同样加 admin API 建户兜底；对本地 <code>AUTH_MODE=supabase</code> 后端全过（含消息幂等、历史、周进度）</td></tr>
   </table>
 
   <h2>五-B、明确的遗留局限（非 bug，需知晓）</h2>
   <ul>
+    <li><strong>浏览器 UI 点击路径未走完</strong>：内置浏览器控制器截图缓存与 DOM 快照不稳定，自动点击/滚动不可靠。已通过浏览器验证：页面加载无白屏、品牌正确、PWA 就绪、前后端配置与 <code>.env</code> 对齐（2026-07-12 事故根因未复现）、mock 模式就绪。完整点击路径需人工在 <code>http://127.0.0.1:8081</code> 复验（本地服务保留运行中）；线上浏览器 E2E 仍是发布前置项（当前网络下线上域名不可达）。</li>
     <li><strong>原书内容不入库（合规边界）</strong>：用户提供的扫描 PDF（205 页，含"霏凡论坛"水印）与追加的文本电子版（epub/mobi/pdf/txt）均来自非出版社官方渠道，仅用于<strong>本地核对与精校</strong>。skill 只保留按教练场景转述的短案例与关键措辞（均标注"原书案例"），<strong>未复制整章原文进仓库</strong>；仓库中可传播来源是 CNVC 官方公开 Introductory Reference PDF。这一轮已用文本电子版完成原书真实案例精校，上一轮"案例为自编示范"的局限已消除。</li>
     <li><strong>在线评测 overall=0.86</strong>：仅因 <code>rewrite_keywords</code> 旧词表对同义表达扣分，case 级全过；改成语义 judge 会动评测契约、影响历史可比性，按"主线不跑偏就不动"原则保留现状。</li>
   </ul>
@@ -138,7 +143,12 @@ node --check web/sw.js
 python3 -c "import json; json.load(open('web/manifest.webmanifest'))"
 
 # 品牌残留
-grep -rn 'NVC Practice Coach\|橘晴' web/index.html web/manifest.webmanifest README.md docs/PRD.md</code></pre>
+grep -rn 'NVC Practice Coach\|橘晴' web/index.html web/manifest.webmanifest README.md docs/PRD.md
+
+# 发布前完整检查（本轮 21:00 已全绿，含本地真实链路）
+TMPDIR=$(mktemp -d) SKIP_REMOTE_API_SMOKE=1 SKIP_RLS_ISOLATION=1 bash scripts/release_preflight.sh
+bash scripts/rls_isolation_check.sh          # 7/7（需 .env 的 SUPABASE_SERVICE_ROLE_KEY）
+bash scripts/supabase_jwt_api_smoke_test.sh http://127.0.0.1:8000   # 7/7（本地 AUTH_MODE=supabase 后端）</code></pre>
 
   <div class="footer">
     报告生成/更新：2026-11-22 · 真实模型调用已获授权，成本可忽略 · 未打印任何密钥值 · 原书 PDF 仅用于本地目录核对，未入库
