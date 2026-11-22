@@ -21,7 +21,7 @@ def test_prod_forbids_mock_auth_without_override():
     payload["MOCK_AUTH_ENABLED"] = "true"
 
     with pytest.raises(ValueError):
-        Settings(**payload)
+        Settings(**payload, _env_file=None)
 
 
 def test_prod_allows_mock_auth_with_explicit_override():
@@ -30,7 +30,7 @@ def test_prod_allows_mock_auth_with_explicit_override():
     payload["MOCK_AUTH_ENABLED"] = "true"
     payload["ALLOW_MOCK_AUTH_IN_PRODUCTION"] = "true"
 
-    cfg = Settings(**payload)
+    cfg = Settings(**payload, _env_file=None)
     assert cfg.mock_auth_enabled is True
     assert cfg.allow_mock_auth_in_production is True
 
@@ -40,7 +40,7 @@ def test_observability_config_numeric_normalization():
     payload["SLOW_REQUEST_MS"] = "0"
     payload["OBSERVABILITY_RECENT_ERROR_LIMIT"] = "-1"
 
-    cfg = Settings(**payload)
+    cfg = Settings(**payload, _env_file=None)
     assert cfg.slow_request_ms == 1
     assert cfg.observability_recent_error_limit == 1
 
@@ -52,7 +52,7 @@ def test_agora_config_is_optional_and_stripped():
     payload["AGORA_AREA"] = "  cn  "
     payload["AGENT_GREETING"] = "  你好，我是小和。  "
 
-    cfg = Settings(**payload)
+    cfg = Settings(**payload, _env_file=None)
 
     assert cfg.agora_app_id == "agora-app-id"
     assert cfg.agora_app_certificate == "agora-secret"
@@ -61,7 +61,7 @@ def test_agora_config_is_optional_and_stripped():
 
 
 def test_agora_credentials_are_not_required_for_text_only_boot():
-    cfg = Settings(**_base_kwargs())
+    cfg = Settings(**_base_kwargs(), _env_file=None)
 
     assert cfg.agora_app_id is None
     assert cfg.agora_app_certificate is None
@@ -73,6 +73,6 @@ def test_invalid_agora_area_falls_back_to_us():
     payload = _base_kwargs()
     payload["AGORA_AREA"] = "moon"
 
-    cfg = Settings(**payload)
+    cfg = Settings(**payload, _env_file=None)
 
     assert cfg.agora_area == "US"
