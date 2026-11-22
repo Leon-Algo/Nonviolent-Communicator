@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import date, timedelta
 from uuid import UUID
@@ -465,7 +466,13 @@ async def create_session_message(
     )
     user_message_id = user_message_result.scalar_one()
 
-    assistant_content = await generate_assistant_reply(scene["context"], payload.content)
+    # 对方回应与推荐改写句是两个独立的 LLM 调用，并发执行以缩短端到端延迟。
+    # 推荐句复用 generate_rewrite（LLM 优先、规则兜底），避免反馈里出现与用户
+    # 输入无关的旧规则模板（用户会在同一条反馈里看到矛盾的"建议句"）。
+    assistant_content, llm_rewrite = await asyncio.gather(
+        generate_assistant_reply(scene["context"], payload.content),
+        generate_rewrite(payload.content),
+    )
     assistant_message_result = await db.execute(
         text(
             """
@@ -483,6 +490,9 @@ async def create_session_message(
     assistant_message_id = assistant_message_result.scalar_one()
 
     analysis = analyze_message(payload.content)
+    # 规则版 next_best_sentence 只作兜底；LLM 可用时优先用贴合用户原句的改写。
+    if llm_rewrite:
+        analysis.feedback.next_best_sentence = llm_rewrite
     await db.execute(
         text(
             """

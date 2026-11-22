@@ -107,6 +107,18 @@ if [[ "${LAST_STATUS}" -lt 200 || "${LAST_STATUS}" -ge 300 ]]; then
   echo "signup status=${LAST_STATUS}, continue to login" >&2
 fi
 
+# Email confirmation is ON and anonymous signup hits email-send rate limits,
+# so ensure the user exists and is pre-confirmed via the admin API
+# (service-role key, see AGENTS.md). Bypasses the rate limit entirely.
+if [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+  admin_create_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password,email_confirm:true}')"
+  curl -sS -o /dev/null -X POST "${SUPABASE_URL%/}/auth/v1/admin/users" \
+    -H "Content-Type: application/json" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -d "${admin_create_payload}" || true
+fi
+
 login_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password}')"
 response="$(curl -sS -w $'\n%{http_code}' -X POST "${SUPABASE_URL%/}/auth/v1/token?grant_type=password" \
   -H "Content-Type: application/json" \

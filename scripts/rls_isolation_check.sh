@@ -19,6 +19,7 @@ require_env() {
 
 require_env SUPABASE_URL
 require_env SUPABASE_ANON_KEY
+require_env SUPABASE_SERVICE_ROLE_KEY
 
 for cmd in curl jq; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
@@ -88,9 +89,23 @@ signup_and_login() {
   local email="$1"
   local password="$2"
 
-  local signup_payload
-  signup_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password}')"
-  request_supabase "POST" "${SUPABASE_URL%/}/auth/v1/signup" "" "${signup_payload}"
+  # Email confirmation is ON and anonymous signup is rate-limited on sends
+  # (over_email_send_rate_limit). Create the user pre-confirmed via the
+  # Supabase admin API with the service-role key instead (see AGENTS.md).
+  # NOTE: bypass request_supabase — it always sends the anon apikey header,
+  # and a duplicate apikey header makes the auth gateway return 401.
+  local create_payload
+  create_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password,email_confirm:true}')"
+  local admin_status
+  admin_status="$(curl -sS -o /tmp/rls_admin_create_body.json -w '%{http_code}' \
+    -X POST "${SUPABASE_URL%/}/auth/v1/admin/users" \
+    -H "Content-Type: application/json" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -d "${create_payload}")"
+  LAST_STATUS="${admin_status}"
+  LAST_BODY="$(cat /tmp/rls_admin_create_body.json)"
+  expect_2xx "admin create ${email}"
 
   local login_payload
   login_payload="$(jq -n --arg email "${email}" --arg password "${password}" '{email:$email,password:$password}')"
