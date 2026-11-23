@@ -2163,10 +2163,15 @@ function loadConfig() {
 
 function getCurrentWeekStart() {
   const now = new Date();
-  const day = (now.getDay() + 6) % 7;
+  const day = (now.getDay() + 6) % 7; // 周一为 0
   now.setHours(0, 0, 0, 0);
   now.setDate(now.getDate() - day);
-  return now.toISOString().slice(0, 10);
+  // 必须用本地日期拼接：toISOString() 是 UTC，东八区 00:00-08:00 会被算成前一天，
+  // 导致周进度查到上一周、显示空白（真实 bug）。
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function syncOutcomeState() {
@@ -3155,6 +3160,14 @@ function showError(err) {
   if (isOfflineLikeError(err)) {
     setNotice("当前离线或网络不可用，请恢复网络后重试。", "warning");
     setOutput({ error: msg, category: "offline_like", hint: "离线状态下可先查看本地缓存内容。" });
+    return;
+  }
+
+  // 前端本地校验错误（无 HTTP 状态、无错误码）：直接把真实原因告诉用户，
+  // 不要折叠成"操作失败，请查看下方错误详情"——用户看不到表单到底缺什么。
+  if (!details.status && !details.errorCode && !details.isNetworkError && msg.length <= 80) {
+    setNotice(msg, "warning");
+    setOutput({ error: msg, category: "validation" });
     return;
   }
 
